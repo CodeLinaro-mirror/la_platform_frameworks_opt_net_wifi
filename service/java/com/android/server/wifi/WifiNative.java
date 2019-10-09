@@ -837,6 +837,7 @@ public class WifiNative {
             }
             mWifiVendorHal.registerRadioModeChangeHandler(
                     new VendorHalRadioModeChangeHandlerInternal());
+            mHostapdHal.terminateIfRunning();
             return true;
         }
     }
