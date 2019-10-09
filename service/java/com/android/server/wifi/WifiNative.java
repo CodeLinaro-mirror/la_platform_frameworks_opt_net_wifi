@@ -931,6 +931,7 @@ public class WifiNative {
             mWifiVendorHal.registerRadioModeChangeHandler(
                     new VendorHalRadioModeChangeHandlerInternal());
             mNetdWrapper = mWifiInjector.makeNetdWrapper();
+            mHostapdHal.terminateIfRunning();
             return true;
         }
     }
