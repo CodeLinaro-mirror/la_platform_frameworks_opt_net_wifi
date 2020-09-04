@@ -3004,6 +3004,15 @@ public class WifiNative {
     }
 
     public String hapdDriverCmd(String ifname, String cmd) {
+        if (ifname.contains("br")) {
+            // bridge interface
+            ArrayList<String> ifaces = listApInterfaces();
+            if (ifaces != null && ifaces.size() > 0) {
+                return mHostapdHal.hostapdCmd(ifaces.get(0), "DRIVER " + cmd);
+            } else {
+                return "iface not ready";
+            }
+        }
         return mHostapdHal.hostapdCmd(ifname, "DRIVER " + cmd);
     }
 
@@ -3035,18 +3044,37 @@ public class WifiNative {
             }
         }
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            if (ifname.contains("br")) {
-                // bridge interface
-                ArrayList<String> ifaces = listApInterfaces();
-                if (ifaces != null && ifaces.size() > 0) {
-                    return setSuccess(hapdDriverCmd(ifaces.get(0), kSetTxPowerCmd));
-                }
-            } else {
-                return setSuccess(hapdDriverCmd(ifname, kSetTxPowerCmd));
-            }
+            return setSuccess(hapdDriverCmd(ifname, kSetTxPowerCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
                    || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
             return setSuccess(wpaDriverCmd(ifname, kSetTxPowerCmd));
+        }
+
+        return false;
+    }
+
+    /**
+     * Set ANI level
+     * @param ifname Name of the interface
+     * @param mode ani level mode (0: fixed, 1: auto)
+     * @param ofdmlvl ANI level
+     * @return results of setAni
+     */
+    public boolean setAni(String ifname, int mode, int ofdmlvl) {
+        int iface_type = -1;
+        final String kSetAniCmd = "SET_ANI_LEVEL " + mode + " " + ofdmlvl;
+
+        synchronized (mLock) {
+            Iface iface = mIfaceMgr.getIface(ifname);
+            if (iface != null) {
+                iface_type = iface.type;
+            }
+        }
+        if (iface_type == Iface.IFACE_TYPE_AP) {
+            return setSuccess(hapdDriverCmd(ifname, kSetAniCmd));
+        } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
+                   || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
+            return setSuccess(wpaDriverCmd(ifname, kSetAniCmd));
         }
 
         return false;

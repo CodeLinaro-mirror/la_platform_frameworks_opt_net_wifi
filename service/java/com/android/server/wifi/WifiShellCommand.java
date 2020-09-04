@@ -157,6 +157,47 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     pw.println("Active AP  ifaces: " + mWifiNative.getSoftApInterfaceNames());
                     return 0;
                 }
+                case "qca-set-ani-level" : {
+                    String ifname = getNextArgRequired();
+                    String mode = getNextArgRequired();
+                    if(ifname == null || mode == null) {
+                        pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                        return -1;
+                    }
+                    int mode_int = -1;
+                    int ofdmlvl = -1;
+                    if("auto".equals(mode)) {
+                        mode_int = 0;
+                        String value = null;
+                        try {
+                            value = getNextArgRequired();
+                        } catch (IllegalArgumentException e) {
+                            // no next arg is expected behavior.
+                        }
+                        if(value != null) {
+                            pw.println("warning: In auto mode, ofdmlvl will be ignored.");
+                        }
+                    } else if ("fixed".equals(mode)) {
+                        mode_int = 1;
+                        String value = getNextArgRequired();
+                        if(value == null) {
+                            pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                            return -1;
+                        }
+                        try {
+                            ofdmlvl = Integer.parseInt(value);
+                        } catch(Exception e) {
+                            pw.println("<ofdmlvl> MUST be integer");
+                            return -1;
+                        }
+                    } else {
+                        pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                        return -1;
+                    }
+                    boolean result = mWifiNative.setAni(ifname, mode_int, ofdmlvl);
+                    pw.println("set-ani-level result -> " + result);
+                    return 0;
+                }
                 case "qca-set-txpower": {
                     String ifname = getNextArgRequired();
                     String value = getNextArgRequired();
@@ -1155,6 +1196,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Lists active STA/AP interfaces (could be bridge interfaces)");
         pw.println("  qca-set-txpower <iface> <power in dBm>");
         pw.println("    Sets max txpower in dBm, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-set-ani-level <iface> <auto|fixed> [<ofdmlvl>]");
+        pw.println("    Sets ani level, and <iface> is from 'qca-list-ifaces'");
+
     }
 
     @Override
