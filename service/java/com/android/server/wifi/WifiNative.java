@@ -3054,6 +3054,44 @@ public class WifiNative {
     }
 
     /**
+     * Get thermal info
+     * @param ifname Name of the interface
+     * @return thermal temperature and state
+     */
+    public int[] getThermalInfo(String ifname) {
+        int iface_type = -1;
+        final String kGetThermalCmd = "GET_THERMAL_INFO";
+
+        synchronized (mLock) {
+            Iface iface = mIfaceMgr.getIface(ifname);
+            if (iface != null) {
+                iface_type = iface.type;
+            }
+        }
+        String reply;
+        if (iface_type == Iface.IFACE_TYPE_AP) {
+            reply = hapdDriverCmd(ifname, kGetThermalCmd);
+        } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
+                   || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
+            reply = wpaDriverCmd(ifname, kGetThermalCmd);
+        } else {
+            return null;
+        }
+
+        int[] info = null;
+        String[] infoString = reply.split("\\s+");
+        try {
+            info = new int[2];
+            info[0] = Integer.parseInt(infoString[0]);
+            info[1] = Integer.parseInt(infoString[1]);
+        } catch (Exception e) {
+            Log.e(TAG, "invalid result for get thermal info");
+            return null;
+        }
+        return info;
+    }
+
+    /**
      * Set ANI level
      * @param ifname Name of the interface
      * @param mode ani level mode (0: fixed, 1: auto)
