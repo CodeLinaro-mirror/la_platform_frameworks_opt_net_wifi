@@ -97,6 +97,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.WorkSource;
+import android.os.SystemProperties;
 import android.provider.Settings;
 import android.system.OsConstants;
 import android.telephony.SubscriptionManager;
@@ -256,6 +257,10 @@ public class ClientModeImpl extends StateMachine {
     private String mLastSimBasedConnectionCarrierName;
 
     private boolean mIpReachabilityDisconnectEnabled = true;
+
+    /* if set to true then disconnect due to IP Reachability lost only when obtained for the first 10 seconds of L2 connection */
+    private boolean mDisconnectOnlyOnInitialIpReachability = true;
+    private boolean mIpReachabilityMonitorActive = true;
 
     private void processRssiThreshold(byte curRssi, int reason,
             WifiNative.WifiRssiEventHandler rssiHandler) {
@@ -629,6 +634,8 @@ public class ClientModeImpl extends StateMachine {
     static final int CMD_START_FILS_CONNECTION                          = BASE + 262;
 
     private static final int CMD_GET_CURRENT_NETWORK                    = BASE + 263;
+    /* Vendor specific cmd: To handle IP Reachability session */
+    private static final int CMD_IP_REACHABILITY_SESSION_END            = BASE + 311;
 
     // For message logging.
     private static final Class[] sMessageClasses = {
@@ -863,6 +870,10 @@ public class ClientModeImpl extends StateMachine {
         mSuspendWakeLock.setReferenceCounted(false);
 
         mWifiConfigManager.addOnNetworkUpdateListener(new OnNetworkUpdateListener());
+
+        mDisconnectOnlyOnInitialIpReachability = SystemProperties
+                 .get("persist.vendor.wifi.enableIpReachabilityMonitorPeriod", "1")
+                 .equals("1");
 
         // CHECKSTYLE:OFF IndentationCheck
         addState(mDefaultState);
@@ -2211,6 +2222,11 @@ public class ClientModeImpl extends StateMachine {
                 sb.append(" ");
                 sb.append(/* DhcpResultsParcelable */ msg.obj);
                 break;
+            case CMD_IP_REACHABILITY_SESSION_END:
+                if (msg.obj != null) {
+                    sb.append(" ").append((String) msg.obj);
+                }
+                break;
             case WifiMonitor.MBO_OCE_BSS_TM_HANDLING_DONE:
                 BtmFrameData frameData = (BtmFrameData) msg.obj;
                 if (frameData != null) {
@@ -3474,6 +3490,7 @@ public class ClientModeImpl extends StateMachine {
                 case CMD_UNWANTED_NETWORK:
                 case CMD_DISCONNECTING_WATCHDOG_TIMER:
                 case CMD_ROAM_WATCHDOG_TIMER:
+                case CMD_IP_REACHABILITY_SESSION_END:
                 case CMD_SET_OPERATIONAL_MODE:
                     // using the CMD_SET_OPERATIONAL_MODE (sent at front of queue) to trigger the
                     // state transitions performed in setOperationalMode.
@@ -4269,6 +4286,7 @@ public class ClientModeImpl extends StateMachine {
                             }
                             mWifiConfigManager.addOrUpdateNetwork(config, Process.WIFI_UID);
                         }
+                        mIpReachabilityMonitorActive = true;
                         transitionTo(mObtainingIpState);
                     } else {
                         logw("Connected to unknown networkId " + mLastNetworkId
@@ -4884,6 +4902,10 @@ public class ClientModeImpl extends StateMachine {
                     mWifiMetrics.addToWifiUsabilityStatsList(WifiUsabilityStats.LABEL_BAD,
                             WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
                     if (mIpReachabilityDisconnectEnabled) {
+                        if (mDisconnectOnlyOnInitialIpReachability && !mIpReachabilityMonitorActive) {
+                            logd("CMD_IP_REACHABILITY_LOST Connect session is over, skip ip reachability lost indication.");
+                            break;
+                        }
                         handleIpReachabilityLost();
                         transitionTo(mDisconnectingState);
                     } else {
@@ -4914,6 +4936,8 @@ public class ClientModeImpl extends StateMachine {
                     if (!mLastBssid.equals(message.obj)) {
                         mLastBssid = (String) message.obj;
                     }
+                    mIpReachabilityMonitorActive = true;
+                    sendMessageDelayed(obtainMessage(CMD_IP_REACHABILITY_SESSION_END, 0, 0), 10000);
                     break;
                 case CMD_ONESHOT_RSSI_POLL:
                     if (!mEnableRssiPolling) {
@@ -5306,6 +5330,7 @@ public class ClientModeImpl extends StateMachine {
                         //
                         // mIpClient.confirmConfiguration() is called within
                         // the handling of SupplicantState.COMPLETED.
+                        mIpReachabilityMonitorActive = true;
                         transitionTo(mConnectedState);
                     } else {
                         mMessageHandlingStatus = MESSAGE_HANDLING_STATUS_DISCARD;
@@ -5360,6 +5385,10 @@ public class ClientModeImpl extends StateMachine {
                     WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN);
             mWifiConnectivityManager.handleConnectionStateChanged(
                     WifiConnectivityManager.WIFI_STATE_CONNECTED);
+
+            if (mIpReachabilityMonitorActive)
+                sendMessageDelayed(obtainMessage(CMD_IP_REACHABILITY_SESSION_END, 0, 0), 10000);
+
             registerConnected();
             mLastConnectAttemptTimestamp = 0;
             mTargetWifiConfiguration = null;
@@ -5550,6 +5579,9 @@ public class ClientModeImpl extends StateMachine {
                         break;
                     }
                     break;
+                case CMD_IP_REACHABILITY_SESSION_END:
+                    mIpReachabilityMonitorActive = false;
+                    break;
                 case CMD_IP_CONFIGURATION_LOST:
                     mWifiMetrics.incrementIpRenewalFailure();
                     handleStatus = NOT_HANDLED;
@@ -5668,7 +5700,8 @@ public class ClientModeImpl extends StateMachine {
 
             /** clear the roaming state, if we were roaming, we failed */
             mIsAutoRoaming = false;
-
+            mIpReachabilityMonitorActive = false;
+            removeMessages(CMD_IP_REACHABILITY_SESSION_END);
             mWifiConnectivityManager.handleConnectionStateChanged(
                     WifiConnectivityManager.WIFI_STATE_DISCONNECTED);
         }
