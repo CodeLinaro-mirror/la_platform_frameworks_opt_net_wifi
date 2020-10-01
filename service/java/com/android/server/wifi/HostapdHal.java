@@ -47,6 +47,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -91,6 +93,8 @@ public class HostapdHal {
     private ServiceManagerDeathRecipient mServiceManagerDeathRecipient;
     private HostapdDeathRecipient mHostapdDeathRecipient;
     private HostapdVendorDeathRecipient mHostapdVendorDeathRecipient;
+    private WifiNative.WifiHalListener mWifiNativeListener;
+
     // Death recipient cookie registered for current supplicant instance.
     private long mDeathRecipientCookie = 0;
 
@@ -1285,10 +1289,33 @@ public class HostapdHal {
     }
 
     // hostapd vendor callback
+    /** WifiNative registered event callbacks */
+    public void registerHalListener(WifiNative.WifiHalListener listener) {
+        mWifiNativeListener = listener;
+    }
+
     private class HostapdVendorIfaceHalCallback extends IHostapdVendorIfaceCallback.Stub {
         @Override
         public void onCtrlEvent(String ifaceName, String eventStr) {
             Log.i(TAG, ifaceName + ": " + eventStr);
+
+            if (eventStr == null) return;
+            if (mWifiNativeListener == null) return;
+
+            // CTRL-EVENT-THERMAL-CHANGED level=3
+            if (eventStr.startsWith(WifiNative.THERMAL_EVENT_STR)) {
+                Matcher match = WifiNative.THERMAL_PATTERN.matcher(eventStr);
+                 if (match.find()) {
+                     try {
+                         int level = Integer.parseInt(match.group(1));
+                         mWifiNativeListener.onThermalChanged(ifaceName, level);
+                     } catch (NumberFormatException e) {
+                         // not possible..
+                     }
+                 } else {
+                     Log.e(TAG, "Could not parse event=" + eventStr);
+                 }
+            }
         }
 
         @Override
