@@ -52,7 +52,8 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.concurrent.ThreadSafe;
 
-import vendor.qti.hardware.wifi.hostapd.V1_2.IHostapdVendor;
+import vendor.qti.hardware.wifi.hostapd.V1_3.IHostapdVendor;
+import vendor.qti.hardware.wifi.hostapd.V1_3.IHostapdVendorIfaceCallback;
 
 /**
  * To maintain thread-safety, the locking protocol is that every non-static method (regardless of
@@ -551,6 +552,12 @@ public class HostapdHal {
                 }
 
                 mSoftApFailureListeners.put(ifaceName, onFailureListener);
+                // Register for vendor lisenters
+                IHostapdVendorIfaceCallback vendorcallback = new HostapdVendorIfaceHalCallback();
+                if(!registerVendorCallback(ifaceParams.ifaceName, mIHostapdVendor, vendorcallback)) {
+                     Log.i(TAG, "Fail to register hostapd vendor Callback.");
+                }
+
                 return true;
             } catch (IllegalArgumentException e) {
                 Log.e(TAG, "Unrecognized apBand: " + band);
@@ -1274,6 +1281,39 @@ public class HostapdHal {
                 handleRemoteException(e, methodStr);
             }
             return gotReply.value;
+        }
+    }
+
+    // hostapd vendor callback
+    private class HostapdVendorIfaceHalCallback extends IHostapdVendorIfaceCallback.Stub {
+        @Override
+        public void onCtrlEvent(String ifaceName, String eventStr) {
+            Log.i(TAG, ifaceName + ": " + eventStr);
+        }
+
+        @Override
+        public void onStaConnected(byte[/* 6 */] bssid) { }
+
+        @Override
+        public void onStaDisconnected(byte[/* 6 */] bssid) { }
+
+        @Override
+        public void onFailure(String ifaceName) { }
+    }
+
+    /** See IHostapdVendor.hal for documentation */
+    private boolean registerVendorCallback(@NonNull String ifaceName,
+            IHostapdVendor service, IHostapdVendorIfaceCallback callback) {
+        synchronized (mLock) {
+            final String methodStr = "registerVendorCallback";
+            if (service == null || callback == null) return false;
+            try {
+                HostapdStatus status =  service.registerVendorCallback_1_3(ifaceName, callback);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+           }
         }
     }
 }
