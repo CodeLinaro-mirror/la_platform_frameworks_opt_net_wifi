@@ -3028,8 +3028,13 @@ public class WifiNative {
     public static final String THERMAL_EVENT_STR = "CTRL-EVENT-THERMAL-CHANGED";
     public static final Pattern THERMAL_PATTERN =
             Pattern.compile(THERMAL_EVENT_STR + " level=([0-9]+)");
+    public static final String CONGESTION_EVENT_STR = "CTRL-EVENT-CONGESTION-REPORT";
+    public static final Pattern CONGESTION_PATTERN =
+            Pattern.compile(CONGESTION_EVENT_STR + " percentage=([0-9]+)");
 
     /* HIDL vendor callbacks */
+    private final HashSet<CongestionChangeListener> mCongestionListeners = new HashSet<>();
+    private final RingBuffer<String> mCongestionEventLogs = new RingBuffer(String.class, 16);
     private final HashSet<ThermalChangeListener> mThermalListeners = new HashSet<>();
     private final RingBuffer<String> mThermalEventLogs = new RingBuffer(String.class, 16);
 
@@ -3037,10 +3042,14 @@ public class WifiNative {
     public interface ThermalChangeListener {
         void onStateChanged(String ifname, int thermal_state);
     }
+    public interface CongestionChangeListener {
+        void onStateChanged(String ifname, int percentage);
+    }
 
     // Defined to be used by Hal
     public interface WifiHalListener {
         void onThermalChanged(String ifname, int thermal_state);
+        void onCongestionChanged(String ifname, int percentage);
     }
 
     private class WifiNativeHalListener implements WifiHalListener {
@@ -3074,6 +3083,28 @@ public class WifiNative {
                 }
             }
         }
+        @Override
+        public void onCongestionChanged(String ifname, int percentage) {
+            synchronized (mCongestionListeners) {
+                // Put into log events
+                SimpleDateFormat formatter= new SimpleDateFormat("MM-dd HH:mm:ss.S");
+                Date date = new Date(System.currentTimeMillis());
+                mCongestionEventLogs.append(formatter.format(date)
+                         + "  WifiNative[" + ifname + "] -> new congestion percentage "
+                         + percentage + "\n");
+
+                // Trigger callbacks
+                if (mCongestionListeners.isEmpty()) {
+                    Log.d(TAG, "no Congestion percentage change listener registered");
+                    return;
+                }
+                Iterator<CongestionChangeListener> it = mCongestionListeners.iterator();
+                while (it.hasNext()) {
+                    CongestionChangeListener listener = it.next();
+                    listener.onStateChanged(ifname, percentage);
+                }
+            }
+        }
     }
 
     public void registerThermalChangeListener(ThermalChangeListener listener) {
@@ -3096,6 +3127,31 @@ public class WifiNative {
         StringBuffer sb = new StringBuffer();
         sb.append("Thermal Event log entries: " + mThermalEventLogs.size() + "\n");
         for (String entry : mThermalEventLogs.toArray()) {
+            sb.append(entry);
+        }
+        return sb.toString();
+    }
+
+    public void registerCongestionChangeListener(CongestionChangeListener listener) {
+        if (listener == null) return;
+
+        synchronized (mCongestionListeners) {
+            mCongestionListeners.add(listener);
+        }
+    }
+
+    public void unregisterCongestionChangeListener(CongestionChangeListener listener) {
+        if (listener == null) return;
+
+        synchronized (mCongestionListeners) {
+            mCongestionListeners.remove(listener);
+        }
+    }
+
+    public String getCongestionEventStr() {
+        StringBuffer sb = new StringBuffer();
+        sb.append("Congestion Event log entries: " + mCongestionEventLogs.size() + "\n");
+        for (String entry : mCongestionEventLogs.toArray()) {
             sb.append(entry);
         }
         return sb.toString();

@@ -1315,6 +1315,18 @@ public class HostapdHal {
                  } else {
                      Log.e(TAG, "Could not parse event=" + eventStr);
                  }
+            } else if (eventStr.startsWith(WifiNative.CONGESTION_EVENT_STR)) {
+                Matcher match = WifiNative.CONGESTION_PATTERN.matcher(eventStr);
+                 if (match.find()) {
+                     try {
+                         int percentage = Integer.parseInt(match.group(1));
+                         mWifiNativeListener.onCongestionChanged(ifaceName, percentage);
+                     } catch (NumberFormatException e) {
+                         // not possible..
+                     }
+                 } else {
+                     Log.e(TAG, "Could not parse event=" + eventStr);
+                 }
             }
         }
 
