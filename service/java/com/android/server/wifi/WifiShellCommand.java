@@ -157,6 +157,42 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     pw.println("Active AP  ifaces: " + mWifiNative.getSoftApInterfaceNames());
                     return 0;
                 }
+                case "qca-set-congestion-report": {
+                    String ifname = getNextArgRequired();
+                    String enable = getNextArgRequired();
+                    if (ifname == null || enable == null) {
+                        pw.println("Invalid argument to 'qca-set-congestion-report <ifname>"
+                           + "<enable|disable> [<threshold> <interval>]' required");
+                        return -1;
+                    }
+                    int enable_int = -1;
+                    int threshold = -1;
+                    int interval = -1;
+                    if("enable".equals(enable)) {
+                        enable_int = 1;
+                        threshold = getNextIntRequired();
+                        interval = getNextIntRequired();
+                    } else if("disable".equals(enable)) {
+                        enable_int = 0;
+                        try {
+                            getNextIntRequired();
+                            pw.println("warning: congestion report disabled, args will be ignored.");
+                        } catch (NumberFormatException e) {
+                            // threshold input but not integer
+                            pw.println("warning: unexpected argument format will be ignored.");
+                        } catch (IllegalArgumentException e) {
+                            // no other args input is expected
+                        }
+                    } else {
+                        pw.println("Invalid argument to 'qca-set-congestion-report " +
+                            "<ifname> <enable|disable> [<threshold> <interval>]' required");
+                        return -1;
+                    }
+                    boolean result =
+                        mWifiNative.setCongestionReport(ifname, enable_int, threshold, interval);
+                    pw.println("set-congestion-report result -> " + result);
+                    return 0;
+                }
                 case "qca-get-thermal-info": {
                     String ifname = getNextArgRequired();
                     WifiNative.ThermalInfo thermalInfo = mWifiNative.getThermalInfo(ifname);
@@ -1223,7 +1259,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Dump thermal events from driver/firmware after boot");
         pw.println("  qca-set-congestion-report <iface> <enable|disable>" +
                 " [<threshold> [interval]]");
-        pw.println("    Sets congestion report, and <iface> is from 'qca-list-ifaces'");
+        pw.println("    Sets congestion report, and <iface> is AP iface" +
+                " from 'qca-list-ifaces'");
         pw.println("  qca-dump-congestion-events");
         pw.println("    Dump congestion events from driver/firmware after boot");
     }
@@ -1239,5 +1276,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             onHelpPrivileged(pw);
         }
         pw.println();
+    }
+
+    private int getNextIntRequired() {
+        String arg = getNextArgRequired(); //might throw IllegalArgumentException
+        int result;
+        result = Integer.parseInt(arg); //migth throw NumberFormatException
+        return result;
     }
 }

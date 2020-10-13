@@ -3256,6 +3256,47 @@ public class WifiNative {
     }
 
     /**
+     * Set congestion report parameter
+     * @param ifname Name of the interface
+     * @param enable Enable or disable congestion report
+     * @param threshold Only when congestion achieved the threshold need to report
+     * @param interval Interval to report congestion
+     * @return result of set congestion report
+     */
+    public boolean setCongestionReport(String ifname, int enable, int threshold, int interval) {
+        int iface_type = -1;
+        final String kSetCongestionReportCmd = "SET_CONGESTION_REPORT "
+            + enable + " " + threshold + " " + interval;
+        synchronized (mLock) {
+            Iface iface = mIfaceMgr.getIface(ifname);
+            if (iface != null) {
+                iface_type = iface.type;
+            }
+        }
+        if (iface_type == Iface.IFACE_TYPE_AP) {
+            if (ifname.contains("br")) {
+                // bridge interface
+                ArrayList<String> ifaces = listApInterfaces();
+                if (ifaces != null && ifaces.size() > 0) {
+                    int index = 0;
+                    boolean ret = true;
+                    while(ret && index < ifaces.size()) {
+                        ret =  ret && setSuccess(mHostapdHal.hostapdCmd(ifaces.get(index),
+                                   "DRIVER " + kSetCongestionReportCmd));
+                        ++index;
+                    }
+                    return ret;
+                } else {
+                    return false;
+                }
+            }
+            return setSuccess(mHostapdHal.hostapdCmd(ifname,
+                       "DRIVER " + kSetCongestionReportCmd));
+        }
+        return false;
+    }
+
+    /**
      * Get thermal info
      * @param ifname Name of the interface
      * @return thermal temperature and state
