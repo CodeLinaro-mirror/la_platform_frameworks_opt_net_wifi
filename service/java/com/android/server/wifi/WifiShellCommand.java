@@ -236,6 +236,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     pw.println(mWifiNative.getThermalEventStr());
                     return 0;
                 }
+                case "qca-dump-congestion-events": {
+                    pw.println(mWifiNative.getCongestionEventStr());
+                    return 0;
+                }
                 case "set-ipreach-disconnect": {
                     boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
                     mClientModeImpl.setIpReachabilityDisconnectEnabled(enabled);
@@ -1217,6 +1221,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Gets thermal info, and <iface> is from 'qca-list-ifaces'");
         pw.println("  qca-dump-thermal-events");
         pw.println("    Dump thermal events from driver/firmware after boot");
+        pw.println("  qca-set-congestion-report <iface> <enable|disable>" +
+                " [<threshold> [interval]]");
+        pw.println("    Sets congestion report, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-dump-congestion-events");
+        pw.println("    Dump congestion events from driver/firmware after boot");
     }
 
     @Override
