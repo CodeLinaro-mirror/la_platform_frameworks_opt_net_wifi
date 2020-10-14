@@ -3161,12 +3161,40 @@ public class WifiNative {
         return false;
     }
 
+    public enum ThermalLevel {
+        THERMAL_LEVEL_FULLPERF,
+        THERMAL_LEVEL_MITIGATION,
+        THERMAL_LEVEL_SHUTDOWN,
+        THERMAL_LEVEL_UNKNOWN
+    }
+
+    public static class ThermalInfo {
+        public ThermalInfo(int temp, int level) {
+            temperature = temp;
+            switch (level) {
+                case 0:
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_FULLPERF;
+                    break;
+                case 2:
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_MITIGATION;
+                    break;
+                case 5:
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_SHUTDOWN;
+                    break;
+                default:
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_UNKNOWN;
+            }
+        }
+        public int temperature;
+        public ThermalLevel thermal_level;
+    }
+
     /**
      * Get thermal info
      * @param ifname Name of the interface
      * @return thermal temperature and state
      */
-    public int[] getThermalInfo(String ifname) {
+    public ThermalInfo getThermalInfo(String ifname) {
         int iface_type = -1;
         final String kGetThermalCmd = "GET_THERMAL_INFO";
 
@@ -3196,7 +3224,7 @@ public class WifiNative {
             Log.e(TAG, "invalid result for get thermal info");
             return null;
         }
-        return info;
+        return new ThermalInfo(info[0], info[1]);
     }
 
     /**
