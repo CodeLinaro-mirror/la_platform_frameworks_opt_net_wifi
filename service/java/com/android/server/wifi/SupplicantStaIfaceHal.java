@@ -78,9 +78,11 @@ import java.util.regex.Pattern;
 
 import javax.annotation.concurrent.ThreadSafe;
 
-import vendor.qti.hardware.wifi.supplicant.V2_0.ISupplicantVendor;
+import vendor.qti.hardware.wifi.supplicant.V2_3.ISupplicantVendor;
 import vendor.qti.hardware.wifi.supplicant.V2_0.ISupplicantVendorIface;
-import vendor.qti.hardware.wifi.supplicant.V2_2.ISupplicantVendorStaIface;
+import vendor.qti.hardware.wifi.supplicant.V2_3.ISupplicantVendorStaIface;
+import vendor.qti.hardware.wifi.supplicant.V2_3.ISupplicantVendorStaIfaceCallback;
+
 
 /**
  * Hal calls for bring up/shut down of the supplicant daemon and for
@@ -110,7 +112,9 @@ public class SupplicantStaIfaceHal {
     // Supplicant Vendor HAL interface objects
     private ISupplicantVendor mISupplicantVendor;
     private HashMap<String, ISupplicantVendorStaIface> mISupplicantVendorStaIfaces = new HashMap<>();
+    private HashMap<String, ISupplicantVendorStaIfaceCallback> mISupplicantVendorStaIfaceCallbacks = new HashMap<>();
     private SupplicantVendorDeathRecipient mSupplicantVendorDeathRecipient;
+    private WifiNative.WifiHalListener mWifiNativeListener;
 
     // Supplicant HAL interface objects
     private IServiceManager mIServiceManager = null;
@@ -587,6 +591,7 @@ public class SupplicantStaIfaceHal {
                 Log.e(TAG, "Trying to teardown unknown vendor interface");
                 return false;
             }
+            mISupplicantVendorStaIfaceCallbacks.remove(ifaceName);
             return true;
         }
     }
@@ -3409,26 +3414,33 @@ public class SupplicantStaIfaceHal {
             return true;
         }
 
-        ISupplicantVendorIface hwBinder = null;
-        if (isVendor_2_0()) {
-            Log.d(TAG, "Try to get Vendor HIDL@2.2 interface");
-            hwBinder = getVendorIfaceV2_2(ifaceName);
-        }
+        Log.d(TAG, "Try to get Supplicant Vendor StaIface");
+        ISupplicantVendorIface hwBinder = getVendorIface(ifaceName);
         if (hwBinder == null) {
             Log.e(TAG, "Failed to get vendor iface binder");
             return false;
         }
-
         ISupplicantVendorStaIface vendor_iface = getVendorStaIfaceMockable(hwBinder);
         if (vendor_iface == null) {
             Log.e(TAG, "Failed to get ISupplicantVendorStaIface proxy");
             return false;
         }
-
         if (!linkToSupplicantVendorStaIfaceDeath(vendor_iface)) {
             return false;
         }
         mISupplicantVendorStaIfaces.put(ifaceName, vendor_iface);
+
+        Log.d(TAG, "Try to register Supplicant Vendor StaIface callback");
+        ISupplicantVendorStaIfaceCallback vendorcallback =
+                new SupplicantVendorStaIfaceHalCallback(ifaceName);
+        if (vendorcallback != null) {
+            if (!registerVendorCallback(vendor_iface, vendorcallback)) {
+                Log.e(TAG, "Failed to register Vendor callback");
+            } else {
+                mISupplicantVendorStaIfaceCallbacks.put(ifaceName, vendorcallback);
+            }
+        }
+
         return true;
     }
 
@@ -3438,7 +3450,7 @@ public class SupplicantStaIfaceHal {
      * @param ifaceName Name of the interface.
      * @return true on success, false otherwise.
      */
-    private ISupplicantVendorIface getVendorIfaceV2_2(@NonNull String ifaceName) {
+    private ISupplicantVendorIface getVendorIface(@NonNull String ifaceName) {
         synchronized (mLock) {
             /** List all supplicant Ifaces */
             final ArrayList<ISupplicant.IfaceInfo> supplicantIfaces = new ArrayList<>();
@@ -3510,23 +3522,6 @@ public class SupplicantStaIfaceHal {
         }
     }
 
-
-    /**
-     * Check if the device is running V2_0 supplicant vendor service.
-     * @return
-     */
-    private boolean isVendor_2_0() {
-        synchronized (mLock) {
-            try {
-                return (getSupplicantVendorMockable() != null);
-            } catch (RemoteException e) {
-                Log.e(TAG, "ISupplicantVendor.getService exception: " + e);
-                supplicantServiceDiedHandler(mDeathRecipientCookie);
-                return false;
-            }
-        }
-    }
-
     /**
      * Helper method to look up the vendor_iface object for the specified iface.
      */
@@ -3546,7 +3541,6 @@ public class SupplicantStaIfaceHal {
             return true;
         }
     }
-
 
     /**
      * Returns false if SupplicantVendorStaIface is null, and logs failure to call methodStr
@@ -3633,5 +3627,85 @@ public class SupplicantStaIfaceHal {
             Log.d(TAG, "ISupplicantStaVendor." + methodStr + "(" + cmd + ")" + "got reply - " + gotReply.value);
         }
         return gotReply.value;
+    }
+
+    /** See ISupplicantVendorStaIface.hal for documentation */
+    private boolean registerVendorCallback(
+            ISupplicantVendorStaIface iface, ISupplicantVendorStaIfaceCallback callback) {
+        synchronized (mLock) {
+            final String methodStr = "registerVendorCallback_2_3";
+            if (iface == null) return false;
+            try {
+                SupplicantStatus status =  iface.registerVendorCallback_2_3(callback);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+
+    private class SupplicantVendorStaIfaceHalCallback extends ISupplicantVendorStaIfaceCallback.Stub {
+        private String mIfaceName;
+
+        SupplicantVendorStaIfaceHalCallback(@NonNull String ifaceName) {
+            mIfaceName = ifaceName;
+        }
+
+        @Override
+        public void onCtrlEvent(String ifaceName, String eventStr) {
+            Log.i(TAG, ifaceName + ": " + eventStr);
+
+            if (eventStr == null) return;
+            if (mWifiNativeListener == null) return;
+
+            // CTRL-EVENT-THERMAL-CHANGED level=3
+            if (eventStr.startsWith(WifiNative.THERMAL_EVENT_STR)) {
+                Matcher match = WifiNative.THERMAL_PATTERN.matcher(eventStr);
+                if (match.find()) {
+                    try {
+                        int level = Integer.parseInt(match.group(1));
+                        mWifiNativeListener.onThermalChanged(ifaceName, level);
+                    } catch (NumberFormatException e) {
+                        // not possible..
+                    }
+                } else {
+                    Log.e(TAG, "Could not parse event=" + eventStr);
+                }
+            }
+        }
+
+        @Override
+        public void onVendorStateChanged(int newState, byte[/* 6 */] bssid, int id,
+                                   ArrayList<Byte> ssid, boolean filsHlpSent) {}
+
+        @Override
+        public void onDppAuthSuccess(boolean initiator) {}
+
+        @Override
+        public void onDppConf(byte type, ArrayList<Byte> ssid, String connector,
+                              ArrayList<Byte> cSignKey, ArrayList<Byte> netAccessKey,
+                              int netAccessExpiry, String passphrase, ArrayList<Byte> psk) {}
+
+        @Override
+        public void onDppNotCompatible(byte capab, boolean initiator) {}
+
+        @Override
+        public void onDppResponsePending() {}
+
+        @Override
+        public void onDppScanPeerQrCode(ArrayList<Byte> bootstrapData) {}
+
+        @Override
+        public void onDppMissingAuth(byte dppAuthParam) {}
+
+        @Override
+        public void onDppNetworkId(int netID) {}
+        /* DPP Callbacks ends */
+    }
+
+    /** WifiNative registered event callbacks */
+    public void registerHalListener(WifiNative.WifiHalListener listener) {
+        mWifiNativeListener = listener;
     }
 }

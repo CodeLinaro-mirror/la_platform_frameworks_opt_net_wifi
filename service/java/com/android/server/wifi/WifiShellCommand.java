@@ -157,6 +157,17 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     pw.println("Active AP  ifaces: " + mWifiNative.getSoftApInterfaceNames());
                     return 0;
                 }
+                case "qca-get-thermal-info": {
+                    String ifname = getNextArgRequired();
+                    int[] thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    if(thermalInfo != null && thermalInfo.length == 2){
+                        pw.println("temperature: " + thermalInfo[0]);
+                        pw.println("thermal state: " + thermalInfo[1]);
+                        return 0;
+                    }
+                    pw.println("fail to get thermal info");
+                    return -1;
+                }
                 case "qca-set-ani-level" : {
                     String ifname = getNextArgRequired();
                     String mode = getNextArgRequired();
@@ -219,6 +230,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
 
                     boolean result = mWifiNative.setTxPower(ifname, dbm);
                     pw.println("set-txpower result -> " + result);
+                    return 0;
+                }
+                case "qca-dump-thermal-events": {
+                    pw.println(mWifiNative.getThermalEventStr());
                     return 0;
                 }
                 case "set-ipreach-disconnect": {
@@ -1198,7 +1213,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Sets max txpower in dBm, and <iface> is from 'qca-list-ifaces'");
         pw.println("  qca-set-ani-level <iface> <auto|fixed> [<ofdmlvl>]");
         pw.println("    Sets ani level, and <iface> is from 'qca-list-ifaces'");
-
+        pw.println("  qca-get-thermal-info <iface>");
+        pw.println("    Gets thermal info, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-dump-thermal-events");
+        pw.println("    Dump thermal events from driver/firmware after boot");
     }
 
     @Override

@@ -41,6 +41,7 @@ import android.util.Log;
 
 import com.android.internal.annotations.Immutable;
 import com.android.internal.util.HexDump;
+import com.android.internal.util.RingBuffer;
 import com.android.server.wifi.hotspot2.NetworkDetail;
 import com.android.server.wifi.util.FrameParser;
 import com.android.server.wifi.util.InformationElementUtil;
@@ -64,6 +65,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
@@ -106,6 +108,10 @@ public class WifiNative {
         mHandler = handler;
         mRandom = random;
         mWifiInjector = wifiInjector;
+
+        WifiNativeHalListener halListener = new WifiNativeHalListener();
+        mSupplicantStaIfaceHal.registerHalListener(halListener);
+        mHostapdHal.registerHalListener(halListener);
     }
 
     /**
@@ -2993,6 +2999,84 @@ public class WifiNative {
         return mWifiVendorHal.setCountryCodeHal(ifaceName, countryCode);
     }
 
+    // --------------------------------------------------------------------------------
+    /* HUDL vendor event string */
+    public static final String THERMAL_EVENT_STR = "CTRL-EVENT-THERMAL-CHANGED";
+    public static final Pattern THERMAL_PATTERN =
+            Pattern.compile(THERMAL_EVENT_STR + " level=([0-9]+)");
+
+    /* HIDL vendor callbacks */
+    private final HashSet<ThermalChangeListener> mThermalListeners = new HashSet<>();
+    private final RingBuffer<String> mThermalEventLogs = new RingBuffer(String.class, 16);
+
+    // Defined to be used by framework
+    public interface ThermalChangeListener {
+        void onStateChanged(String ifname, int thermal_state);
+    }
+
+    // Defined to be used by Hal
+    public interface WifiHalListener {
+        void onThermalChanged(String ifname, int thermal_state);
+    }
+
+    private class WifiNativeHalListener implements WifiHalListener {
+        @Override
+        public void onThermalChanged(String ifname, int thermal_state) {
+            synchronized (mThermalListeners) {
+                // Reduce duplicate Thermal change event report.
+                Iface iface = mIfaceMgr.findAnyIfaceOfType(Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY);
+                String staIfname = (iface != null) ? iface.name : null;
+                if (staIfname != null && !staIfname.equals(ifname)) {
+                    Log.d(TAG, "ignore duplicate report thermal in other ifaces - " + ifname);
+                    return;
+                }
+
+                // Put into log events
+                SimpleDateFormat formatter= new SimpleDateFormat("MM-dd HH:mm:ss.S");
+                Date date = new Date(System.currentTimeMillis());
+                mThermalEventLogs.append(formatter.format(date)
+                         + "  WifiNative[" + ifname + "] -> new thermal state "
+                         + thermal_state + "\n");
+
+                // Trigger callbacks
+                if (mThermalListeners.isEmpty()) {
+                    Log.d(TAG, "no Thermal state change listener registered");
+                    return;
+                }
+                Iterator<ThermalChangeListener> it = mThermalListeners.iterator();
+                while (it.hasNext()) {
+                    ThermalChangeListener listener = it.next();
+                    listener.onStateChanged(ifname, thermal_state);
+                }
+            }
+        }
+    }
+
+    public void registerThermalChangeListener(ThermalChangeListener listener) {
+        if (listener == null) return;
+
+        synchronized (mThermalListeners) {
+            mThermalListeners.add(listener);
+        }
+    }
+
+    public void unregisterThermalChangeListener(ThermalChangeListener listener) {
+        if (listener == null) return;
+
+        synchronized (mThermalListeners) {
+            mThermalListeners.remove(listener);
+        }
+    }
+
+    public String getThermalEventStr() {
+        StringBuffer sb = new StringBuffer();
+        sb.append("Thermal Event log entries: " + mThermalEventLogs.size() + "\n");
+        for (String entry : mThermalEventLogs.toArray()) {
+            sb.append(entry);
+        }
+        return sb.toString();
+    }
+
     // ---------------------------------------------------------------------------------
     /* Hostapd / Wpa_supplicant vendor APIs */
     public ArrayList<String> listApInterfaces() {
@@ -3051,6 +3135,44 @@ public class WifiNative {
         }
 
         return false;
+    }
+
+    /**
+     * Get thermal info
+     * @param ifname Name of the interface
+     * @return thermal temperature and state
+     */
+    public int[] getThermalInfo(String ifname) {
+        int iface_type = -1;
+        final String kGetThermalCmd = "GET_THERMAL_INFO";
+
+        synchronized (mLock) {
+            Iface iface = mIfaceMgr.getIface(ifname);
+            if (iface != null) {
+                iface_type = iface.type;
+            }
+        }
+        String reply;
+        if (iface_type == Iface.IFACE_TYPE_AP) {
+            reply = hapdDriverCmd(ifname, kGetThermalCmd);
+        } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
+                   || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
+            reply = wpaDriverCmd(ifname, kGetThermalCmd);
+        } else {
+            return null;
+        }
+
+        int[] info = null;
+        String[] infoString = reply.split("\\s+");
+        try {
+            info = new int[2];
+            info[0] = Integer.parseInt(infoString[0]);
+            info[1] = Integer.parseInt(infoString[1]);
+        } catch (Exception e) {
+            Log.e(TAG, "invalid result for get thermal info");
+            return null;
+        }
+        return info;
     }
 
     /**
