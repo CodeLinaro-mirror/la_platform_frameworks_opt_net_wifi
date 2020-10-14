@@ -159,10 +159,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "qca-get-thermal-info": {
                     String ifname = getNextArgRequired();
-                    int[] thermalInfo = mWifiNative.getThermalInfo(ifname);
-                    if(thermalInfo != null && thermalInfo.length == 2){
-                        pw.println("temperature: " + thermalInfo[0]);
-                        pw.println("thermal state: " + thermalInfo[1]);
+                    WifiNative.ThermalInfo thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    if(thermalInfo != null){
+                        pw.println("temperature: " + thermalInfo.temperature);
+                        pw.println("thermal state: " + thermalInfo.thermal_level);
                         return 0;
                     }
                     pw.println("fail to get thermal info");
