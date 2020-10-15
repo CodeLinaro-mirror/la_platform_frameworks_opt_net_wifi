@@ -317,4 +317,9 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
     public @WifiConfigStore.StoreFileId int getStoreFileId() {
         return WifiConfigStore.STORE_FILE_SHARED_SOFTAP; // Shared softap store.
     }
+
+    @Override
+    public @WifiConfigStore.StoreFileId int getStoreFileId(int staId) {
+        return WifiConfigStore.STORE_FILE_SHARED_SOFTAP; // Shared softap store.
+    }
 }
