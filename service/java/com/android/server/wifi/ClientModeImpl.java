@@ -5930,12 +5930,17 @@ public class ClientModeImpl extends StateMachine {
             final WifiConfiguration currentConfig = getCurrentWifiConfiguration();
             final boolean isUsingStaticIp =
                     (currentConfig.getIpAssignment() == IpConfiguration.IpAssignment.STATIC);
+            final boolean isUsingMacRandomization =
+                    currentConfig.macRandomizationSetting
+                            == WifiConfiguration.RANDOMIZATION_PERSISTENT
+                            && isConnectedMacRandomizationEnabled();
             if (mVerboseLoggingEnabled) {
                 final String key = currentConfig.configKey();
                 log("enter ObtainingIpState netId=" + Integer.toString(mLastNetworkId)
                         + " " + key + " "
                         + " roam=" + mIsAutoRoaming
-                        + " static=" + isUsingStaticIp);
+                        + " static=" + isUsingStaticIp
+                        + " randomMac=" + isUsingMacRandomization);
             }
 
             // Send event to CM & network change broadcast
@@ -5975,7 +5980,7 @@ public class ClientModeImpl extends StateMachine {
                     mIpClient.setTcpBufferSizes(mTcpBufferSizes);
                 }
             }
-            final ProvisioningConfiguration prov;
+	    final ProvisioningConfiguration.Builder prov;
 
             if (mIsFilsConnection && mIsIpClientStarted) {
                 setPowerSaveForFilsDhcp();
@@ -5985,19 +5990,20 @@ public class ClientModeImpl extends StateMachine {
                                 .withPreDhcpAction()
                                 .withApfCapabilities(mWifiNative.getApfCapabilities(mInterfaceName))
                                 .withNetwork(getCurrentNetwork())
-                                .withDisplayName(currentConfig.SSID)
-                                .build();
+				.withDisplayName(currentConfig.SSID);
+		    if (isUsingMacRandomization) {
+		        prov.withRandomMacAddress();
+	            }		
                 } else {
                     StaticIpConfiguration staticIpConfig = currentConfig.getStaticIpConfiguration();
                     prov = new ProvisioningConfiguration.Builder()
                                 .withStaticConfiguration(staticIpConfig)
                                 .withApfCapabilities(mWifiNative.getApfCapabilities(mInterfaceName))
                                 .withNetwork(getCurrentNetwork())
-                                .withDisplayName(currentConfig.SSID)
-                                .build();
+				.withDisplayName(currentConfig.SSID);
                 }
                 if (mIpClient != null) {
-                  mIpClient.startProvisioning(prov);
+		  mIpClient.startProvisioning(prov.build());	
                   mIsIpClientStarted = true;
                 }
             }
