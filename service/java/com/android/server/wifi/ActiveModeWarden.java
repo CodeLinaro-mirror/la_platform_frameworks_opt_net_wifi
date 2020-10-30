@@ -900,6 +900,36 @@ public class ActiveModeWarden {
                 super.exit();
             }
 
+            private void handleCmdAddWifiSet(int staId, int enable) {
+                if (enable == 1)
+                    enableStation(staId);
+                else
+                    disableStation(staId);
+            }
+
+            private boolean handleCmdAirplaneToggled(Message msg) {
+                // airplane mode toggled on is handled in the default state
+                if (mSettingsStore.isAirplaneModeOn()) {
+                    mIsDisablingDueToAirplaneMode = true;
+                    return NOT_HANDLED;
+                } else {
+                    if (mIsDisablingDueToAirplaneMode) {
+                        // Previous airplane mode toggle on is being processed, defer the
+                        // message toggle off until previous processing is completed.
+                        // Once previous airplane mode toggle is complete, we should
+                        // transition to DisabledState. There, we will process the deferred
+                        // airplane mode toggle message to disable airplane mode.
+                        deferMessage(msg);
+                    } else {
+                        // when airplane mode is toggled off, but wifi is on, we can keep it
+                        // on
+                        log("airplane mode toggled - and airplane mode is off. return "
+                                 + "handled");
+                    }
+                    return HANDLED;
+                }
+            }
+
             @Override
             public boolean processMessageFiltered(Message msg) {
                 switch (msg.what) {
@@ -918,10 +948,7 @@ public class ActiveModeWarden {
                     case CMD_ADD_WIFI_SET:
                         int staId = msg.arg1;
                         int enable = msg.arg2;
-                        if (enable == 1)
-                            enableStation(staId);
-                        else
-                            disableStation(staId);
+                        handleCmdAddWifiSet(staId, enable);
                         break;
                     case CMD_SET_AP:
                         // note: CMD_SET_AP is handled/dropped in ECM mode - will not start here
@@ -932,26 +959,7 @@ public class ActiveModeWarden {
                         }
                         break;
                     case CMD_AIRPLANE_TOGGLED:
-                        // airplane mode toggled on is handled in the default state
-                        if (mSettingsStore.isAirplaneModeOn()) {
-                            mIsDisablingDueToAirplaneMode = true;
-                            return NOT_HANDLED;
-                        } else {
-                            if (mIsDisablingDueToAirplaneMode) {
-                                // Previous airplane mode toggle on is being processed, defer the
-                                // message toggle off until previous processing is completed.
-                                // Once previous airplane mode toggle is complete, we should
-                                // transition to DisabledState. There, we will process the deferred
-                                // airplane mode toggle message to disable airplane mode.
-                                deferMessage(msg);
-                            } else {
-                                // when airplane mode is toggled off, but wifi is on, we can keep it
-                                // on
-                                log("airplane mode toggled - and airplane mode is off. return "
-                                        + "handled");
-                            }
-                            return HANDLED;
-                        }
+                        return handleCmdAirplaneToggled(msg);
                     case CMD_AP_STOPPED:
                     case CMD_AP_START_FAILURE:
                         if (!hasAnyModeManager()) {
