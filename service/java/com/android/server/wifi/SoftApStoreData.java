@@ -58,6 +58,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
     private static final String XML_TAG_CLIENT_CONTROL_BY_USER = "ClientControlByUser";
     private static final String XML_TAG_BLOCKED_CLIENT_LIST = "BlockedClientList";
     private static final String XML_TAG_ALLOWED_CLIENT_LIST = "AllowedClientList";
+    private static final String XML_TAG_AP_BAND_LIST = "ApBandList";
 
     private final Context mContext;
     private final SettingsMigrationDataHolder mSettingsMigrationDataHolder;
@@ -118,7 +119,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
             XmlUtil.writeNextValue(out, XML_TAG_CHANNEL, softApConfig.getChannel());
             XmlUtil.writeNextValue(out, XML_TAG_HIDDEN_SSID, softApConfig.isHiddenSsid());
             XmlUtil.writeNextValue(out, XML_TAG_SECURITY_TYPE, softApConfig.getSecurityType());
-            if (softApConfig.getSecurityType() != SoftApConfiguration.SECURITY_TYPE_OPEN) {
+            if (!ApConfigUtil.isOpenOweHotspot(softApConfig.getSecurityType())) {
                 XmlUtil.writeNextValue(out, XML_TAG_PASSPHRASE,
                         softApConfig.getPassphrase());
             }
@@ -140,6 +141,10 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
             XmlUtil.SoftApConfigurationXmlUtil.writeClientListToXml(out,
                     softApConfig.getAllowedClientList());
             XmlUtil.writeNextSectionEnd(out, XML_TAG_ALLOWED_CLIENT_LIST);
+
+            XmlUtil.writeNextSectionStart(out, XML_TAG_AP_BAND_LIST);
+            XmlUtil.SoftApConfigurationXmlUtil.writeBandListToXml(out, softApConfig.getBands());
+            XmlUtil.writeNextSectionEnd(out, XML_TAG_AP_BAND_LIST);
         }
     }
 
@@ -164,6 +169,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
         int apBand = -1;
         List<MacAddress> blockedList = new ArrayList<>();
         List<MacAddress> allowedList = new ArrayList<>();
+        List<Integer> bandList = new ArrayList<>();
         boolean autoShutdownEnabledTagPresent = false;
         try {
             while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
@@ -227,6 +233,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
                 } else {
                     String tagName = in.getName();
                     List<MacAddress> parseredList;
+                    List<Integer> parseBandList;
                     if (tagName == null) {
                         throw new XmlPullParserException("Unexpected null tag found");
                     }
@@ -243,6 +250,12 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
                                     in, outerTagDepth + 1);
                             if (parseredList != null) allowedList = new ArrayList<>(parseredList);
                             break;
+                        case XML_TAG_AP_BAND_LIST:
+                            parseBandList =
+                                    XmlUtil.SoftApConfigurationXmlUtil.parseBandListFromXml(
+                                    in, outerTagDepth + 1);
+                            if (parseBandList != null) bandList = new ArrayList<>(parseBandList);
+                            break;
                         default:
                             Log.w(TAG, "Ignoring unknown tag found: " + tagName);
                             break;
@@ -251,6 +264,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
             }
             softApConfigBuilder.setBlockedClientList(blockedList);
             softApConfigBuilder.setAllowedClientList(allowedList);
+            softApConfigBuilder.setBands(bandList);
             // Set channel and band
             if (channel == 0) {
                 softApConfigBuilder.setBand(apBand);
@@ -263,7 +277,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
                 Log.e(TAG, "Failed to parse SSID");
                 return;
             }
-            if (securityType != SoftApConfiguration.SECURITY_TYPE_OPEN) {
+            if (ApConfigUtil.isOpenOweHotspot(securityType)) {
                 softApConfigBuilder.setPassphrase(passphrase, securityType);
             }
             if (!autoShutdownEnabledTagPresent) {
@@ -301,6 +315,11 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
 
     @Override
     public @WifiConfigStore.StoreFileId int getStoreFileId() {
+        return WifiConfigStore.STORE_FILE_SHARED_SOFTAP; // Shared softap store.
+    }
+
+    @Override
+    public @WifiConfigStore.StoreFileId int getStoreFileId(int staId) {
         return WifiConfigStore.STORE_FILE_SHARED_SOFTAP; // Shared softap store.
     }
 }

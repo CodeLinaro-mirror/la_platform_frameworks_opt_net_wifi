@@ -152,6 +152,90 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         final PrintWriter pw = getOutPrintWriter();
         try {
             switch (cmd) {
+                case "qca-list-ifaces" : {
+                    pw.println("Active STA ifaces: " + mWifiNative.getClientInterfaceNames());
+                    pw.println("Active AP  ifaces: " + mWifiNative.getSoftApInterfaceNames());
+                    return 0;
+                }
+                case "qca-get-thermal-info": {
+                    String ifname = getNextArgRequired();
+                    int[] thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    if(thermalInfo != null && thermalInfo.length == 2){
+                        pw.println("temperature: " + thermalInfo[0]);
+                        pw.println("thermal state: " + thermalInfo[1]);
+                        return 0;
+                    }
+                    pw.println("fail to get thermal info");
+                    return -1;
+                }
+                case "qca-set-ani-level" : {
+                    String ifname = getNextArgRequired();
+                    String mode = getNextArgRequired();
+                    if(ifname == null || mode == null) {
+                        pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                        return -1;
+                    }
+                    int mode_int = -1;
+                    int ofdmlvl = -1;
+                    if("auto".equals(mode)) {
+                        mode_int = 0;
+                        String value = null;
+                        try {
+                            value = getNextArgRequired();
+                        } catch (IllegalArgumentException e) {
+                            // no next arg is expected behavior.
+                        }
+                        if(value != null) {
+                            pw.println("warning: In auto mode, ofdmlvl will be ignored.");
+                        }
+                    } else if ("fixed".equals(mode)) {
+                        mode_int = 1;
+                        String value = getNextArgRequired();
+                        if(value == null) {
+                            pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                            return -1;
+                        }
+                        try {
+                            ofdmlvl = Integer.parseInt(value);
+                        } catch(Exception e) {
+                            pw.println("<ofdmlvl> MUST be integer");
+                            return -1;
+                        }
+                    } else {
+                        pw.println("Invalid argument to 'qca-set-ani-level <ifname> <auto|fixed> [<ofdmlvl>]' required");
+                        return -1;
+                    }
+                    boolean result = mWifiNative.setAni(ifname, mode_int, ofdmlvl);
+                    pw.println("set-ani-level result -> " + result);
+                    return 0;
+                }
+                case "qca-set-txpower": {
+                    String ifname = getNextArgRequired();
+                    String value = getNextArgRequired();
+                    if (ifname == null || value == null) {
+                        pw.println("Invalid argument to 'qca-set-txpower <ifname> <max tx power in dBm>' required");
+                        return -1;
+                    }
+                    int dbm = 0;
+                    try {
+                        dbm = Integer.parseInt(value);
+                    } catch(Exception e) {
+                        pw.println("<max tx power in dBm> MUST be integer");
+                        return -1;
+                    }
+                    if (dbm < 0) {
+                        pw.println("<max tx power in dBm> MUST >= 0");
+                        return -1;
+                    }
+
+                    boolean result = mWifiNative.setTxPower(ifname, dbm);
+                    pw.println("set-txpower result -> " + result);
+                    return 0;
+                }
+                case "qca-dump-thermal-events": {
+                    pw.println(mWifiNative.getThermalEventStr());
+                    return 0;
+                }
                 case "set-ipreach-disconnect": {
                     boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
                     mClientModeImpl.setIpReachabilityDisconnectEnabled(enabled);
@@ -1123,6 +1207,16 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Queries whether network requests from the app is approved or not.");
         pw.println("    Note: This only returns whether the app was set via the " +
                 "'network-requests-set-user-approved' shell command");
+        pw.println("  qca-list-ifaces");
+        pw.println("    Lists active STA/AP interfaces (could be bridge interfaces)");
+        pw.println("  qca-set-txpower <iface> <power in dBm>");
+        pw.println("    Sets max txpower in dBm, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-set-ani-level <iface> <auto|fixed> [<ofdmlvl>]");
+        pw.println("    Sets ani level, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-get-thermal-info <iface>");
+        pw.println("    Gets thermal info, and <iface> is from 'qca-list-ifaces'");
+        pw.println("  qca-dump-thermal-events");
+        pw.println("    Dump thermal events from driver/firmware after boot");
     }
 
     @Override

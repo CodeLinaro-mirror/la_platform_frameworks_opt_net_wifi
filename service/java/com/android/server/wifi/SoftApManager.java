@@ -38,6 +38,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -354,9 +355,13 @@ public class SoftApManager implements ActiveModeManager {
     }
 
     private int setCountryCode() {
-        int band = mApConfig.getSoftApConfiguration().getBand();
+        List<Integer> bands = new ArrayList<Integer>(mApConfig.getSoftApConfiguration().getBands());
+        if (bands.size() == 0) {
+            // Fall back to legacy single AP band.
+            bands.add(mApConfig.getSoftApConfiguration().getBand());
+        }
         if (TextUtils.isEmpty(mCountryCode)) {
-            if (band == SoftApConfiguration.BAND_5GHZ) {
+            if (bands.contains(SoftApConfiguration.BAND_5GHZ)) {
                 // Country code is mandatory for 5GHz band.
                 Log.e(TAG, "Invalid country code, required for setting up soft ap in 5GHz");
                 return ERROR_GENERIC;
@@ -367,7 +372,7 @@ public class SoftApManager implements ActiveModeManager {
 
         if (!mWifiNative.setCountryCodeHal(
                 mApInterfaceName, mCountryCode.toUpperCase(Locale.ROOT))) {
-            if (band == SoftApConfiguration.BAND_5GHZ) {
+            if (bands.contains(SoftApConfiguration.BAND_5GHZ)) {
                 // Return an error if failed to set country code when AP is configured for
                 // 5GHz band.
                 Log.e(TAG, "Failed to set country code, required for setting up soft ap in 5GHz");
@@ -408,6 +413,11 @@ public class SoftApManager implements ActiveModeManager {
 
         boolean acsEnabled = mCurrentSoftApCapability.areFeaturesSupported(
                 SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD);
+        // Concurrent BSSes requires ACS to be enabled.
+        if (config.getBands().size() > 1 && !acsEnabled) {
+             Log.i(TAG, "Unable to start concurrent soft AP without acs - ovewrite it");
+             acsEnabled = true;
+        }
 
         result = ApConfigUtil.updateApChannelConfig(
                 mWifiNative, mContext.getResources(), mCountryCode, localConfigBuilder, config,
@@ -458,6 +468,36 @@ public class SoftApManager implements ActiveModeManager {
         mWifiDiagnostics.stopLogging(mApInterfaceName);
         mWifiNative.teardownInterface(mApInterfaceName);
         Log.d(TAG, "Soft AP is stopped");
+    }
+
+    private void softapVendorInit(ArrayList<String> names) {
+        if (names == null || names.size() == 0) return;
+
+        // Below is the sample commands to set vendor/interworking elements.
+        // - wlan.debug.vendor_init can be set for test purpose.
+        // - OEM needs to integrate their implementation as below.
+
+        // SAMPLE COMMANDS START
+        if (SystemProperties.getInt("wlan.sample.vendor_init", 0) != 1) {
+            Log.i(TAG, "wlan.sample.vendor_init not set to 1, not set sample values");
+            return;
+        }
+
+        String ifname = names.get(0); // OEM to pick one AP interface
+        String mac = mWifiNative.hostapdCmd(ifname, "DRIVER Macaddr").replace("Macaddr = ", "");
+        Log.d(TAG, "hostapdCmd(DRIVER Macaddr)=" + mac);
+        // Take this mac and build the vendor element string
+        mWifiNative.hostapdCmd(ifname, "SET vendor_elements dd0411223301");
+        mWifiNative.hostapdCmd(ifname, "SET assocresp_elements dd0411223302");
+        mWifiNative.hostapdCmd(ifname, "SET interworking 1");
+        mWifiNative.hostapdCmd(ifname, "SET access_network_type 4");
+        mWifiNative.hostapdCmd(ifname, "SET esr 1");
+        mWifiNative.hostapdCmd(ifname, "SET internet 1");
+        mWifiNative.hostapdCmd(ifname, "SET venue_type 1");
+        mWifiNative.hostapdCmd(ifname, "SET venue_group 10");
+        mWifiNative.hostapdCmd(ifname, "SET hessid 00:03:7f:89:31:88");
+        mWifiNative.hostapdCmd(ifname, "UPDATE_BEACON");
+        // SAMPLE COMMANDS END
     }
 
     private boolean checkSoftApClient(SoftApConfiguration config, WifiClient newClient) {
@@ -518,6 +558,7 @@ public class SoftApManager implements ActiveModeManager {
         public static final int CMD_SOFT_AP_CHANNEL_SWITCHED = 9;
         public static final int CMD_UPDATE_CAPABILITY = 10;
         public static final int CMD_UPDATE_CONFIG = 11;
+        public static final int CMD_SOFT_AP_VENDOR_INIT = 20;
 
         private final State mIdleState = new IdleState();
         private final State mStartedState = new StartedState();
@@ -570,6 +611,26 @@ public class SoftApManager implements ActiveModeManager {
                         mStateMachine.quitNow();
                         break;
                     case CMD_START:
+                        SoftApConfiguration config = mApConfig.getSoftApConfiguration();
+                        int bandsize = (config != null) ? config.getBands().size() : 0;
+                        if (config.getSecurityType() ==
+                                SoftApConfiguration.SECURITY_TYPE_OWE_TRANSITION) {
+                            bandsize = 2;
+                        }
+                        if (bandsize > 0) {
+                              try {
+                                  SystemProperties.set("persist.vendor.wifi.softap.bands", Integer.toString(bandsize));
+                              } catch (RuntimeException e) {
+                                  Log.e(TAG, "Failed to start dual AP - reason=" + e);
+                                  return false;
+                              }
+                        } else {
+                              try {
+                                  SystemProperties.set("persist.vendor.wifi.softap.bands", "0");
+                              } catch (RuntimeException e) {
+                                  // fall through
+                              }
+                        }
                         mApInterfaceName = mWifiNative.setupInterfaceForSoftApMode(
                                 mWifiNativeInterfaceCallback);
                         if (TextUtils.isEmpty(mApInterfaceName)) {
@@ -817,6 +878,10 @@ public class SoftApManager implements ActiveModeManager {
                 mConnectedClients.clear();
                 mEverReportMetricsForMaxClient = false;
                 scheduleTimeoutMessage();
+
+                // No sync mechnism between hostapd and framework.
+                // Try wait 500ms for vendor init
+                sendMessageDelayed(CMD_SOFT_AP_VENDOR_INIT, 500 /*ms*/);
             }
 
             @Override
@@ -898,6 +963,16 @@ public class SoftApManager implements ActiveModeManager {
                             break;
                         }
                         setSoftApChannel(message.arg1, message.arg2);
+                        break;
+                    case CMD_SOFT_AP_VENDOR_INIT:
+                        ArrayList<String> names = mWifiNative.listApInterfaces();
+                        if(names != null && "PONG\n".equals(mWifiNative.hostapdCmd(names.get(0), "PING"))) {
+                            // Hostapd is ready
+                            Log.d(TAG, "start to init softAP vendor"); 
+                            softapVendorInit(names);
+                        } else {
+                            sendMessageDelayed(CMD_SOFT_AP_VENDOR_INIT, 100 /*ms*/);
+                        }
                         break;
                     case CMD_INTERFACE_STATUS_CHANGED:
                         boolean isUp = message.arg1 == 1;

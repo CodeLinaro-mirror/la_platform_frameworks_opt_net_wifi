@@ -32,6 +32,7 @@ import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.IHwBinder.DeathRecipient;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -46,10 +47,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.concurrent.ThreadSafe;
+
+import vendor.qti.hardware.wifi.hostapd.V1_3.IHostapdVendor;
+import vendor.qti.hardware.wifi.hostapd.V1_3.IHostapdVendorIfaceCallback;
 
 /**
  * To maintain thread-safety, the locking protocol is that every non-static method (regardless of
@@ -62,6 +68,10 @@ public class HostapdHal {
     public static final String HAL_INSTANCE_NAME = "default";
     @VisibleForTesting
     public static final long WAIT_FOR_DEATH_TIMEOUT_MS = 50L;
+
+    // Vendor Encryption Type extends hostapd.V1_2.IHostapd.EncryptionType
+    private static final int VENDOR_ENCRYPTION_TYPE_OWE = 7;
+    private static final int VENDOR_ENCRYPTION_TYPE_OWE_TRANSITION = 8;
 
     private final Object mLock = new Object();
     private boolean mVerboseLoggingEnabled = false;
@@ -77,10 +87,14 @@ public class HostapdHal {
     // Hostapd HAL interface objects
     private IServiceManager mIServiceManager = null;
     private IHostapd mIHostapd;
+    private IHostapdVendor mIHostapdVendor;
     private HashMap<String, Runnable> mSoftApFailureListeners = new HashMap<>();
     private HostapdDeathEventHandler mDeathEventHandler;
     private ServiceManagerDeathRecipient mServiceManagerDeathRecipient;
     private HostapdDeathRecipient mHostapdDeathRecipient;
+    private HostapdVendorDeathRecipient mHostapdVendorDeathRecipient;
+    private WifiNative.WifiHalListener mWifiNativeListener;
+
     // Death recipient cookie registered for current supplicant instance.
     private long mDeathRecipientCookie = 0;
 
@@ -130,6 +144,7 @@ public class HostapdHal {
         mEventHandler = handler;
         mServiceManagerDeathRecipient = new ServiceManagerDeathRecipient();
         mHostapdDeathRecipient = new HostapdDeathRecipient();
+        mHostapdVendorDeathRecipient = new HostapdVendorDeathRecipient();
     }
 
     /**
@@ -220,6 +235,7 @@ public class HostapdHal {
                 Log.i(TAG, "Registering IHostapd service ready callback.");
             }
             mIHostapd = null;
+            mIHostapdVendor = null;
             if (mIServiceManager != null) {
                 // Already have an IServiceManager and serviceNotification registered, don't
                 // don't register another.
@@ -322,6 +338,8 @@ public class HostapdHal {
                 return false;
             }
 
+            if (!initHostapdVendorService())
+                Log.e(TAG, "Failed to init HostapdVendor service");
             // Setup log level
             setLogLevel();
         }
@@ -345,7 +363,12 @@ public class HostapdHal {
         mForceApChannel = false;
     }
 
-    private boolean isSendFreqRangesNeeded(@BandType int band) {
+    private boolean isSendFreqRangesNeeded(List<Integer> bands, @BandType int band) {
+        // return false for new list of Bands
+        if (bands.size() > 0) {
+            return false;
+        }
+
         // Fist we check if one of the selected bands has restrictions in the overlay file.
         // Note,
         //   - We store the config string here for future use, hence we need to check all bands.
@@ -399,6 +422,15 @@ public class HostapdHal {
 
         // In all other cases, we don't need to set the freqList
         return false;
+    }
+
+    private boolean isWifiSoftapIeee80211axSupported() {
+        if (!SystemProperties.getBoolean("ro.vendor.wlan.11ax", true)) {
+            Log.i(TAG, "Disable 11ax due to ro.vendor.wlan.11ax is false");
+            return false;
+        }
+        return mContext.getResources().getBoolean(
+                       R.bool.config_wifiSoftapIeee80211axSupported);
     }
 
     /**
@@ -478,8 +510,7 @@ public class HostapdHal {
                         ifaceParams1_2.V1_1 = ifaceParams1_1;
 
                         ifaceParams1_2.hwModeParams.enable80211AX =
-                                mContext.getResources().getBoolean(
-                                    R.bool.config_wifiSoftapIeee80211axSupported);
+                                isWifiSoftapIeee80211axSupported();
                         ifaceParams1_2.hwModeParams.enable6GhzBand =
                                 mContext.getResources().getBoolean(
                                     R.bool.config_wifiSoftap6ghzSupported);
@@ -495,11 +526,11 @@ public class HostapdHal {
                         ifaceParams1_2.hwModeParams.enableHeTargetWakeTime =
                                 mContext.getResources().getBoolean(
                                     R.bool.config_wifiSoftapHeTwtSupported);
-                        ifaceParams1_2.channelParams.bandMask = getHalBandMask(band);
+                        ifaceParams1_2.channelParams.bandMask = getHalBandMasks(config.getBands(), band);
 
                         // Prepare freq ranges/lists if needed
                         if (ifaceParams.channelParams.enableAcs
-                                && isSendFreqRangesNeeded(band)) {
+                                && isSendFreqRangesNeeded(config.getBands(), band)) {
                             if ((band & SoftApConfiguration.BAND_2GHZ) != 0) {
                                 ifaceParams1_2.channelParams.acsChannelFreqRangesMhz.addAll(
                                         toAcsFreqRanges(SoftApConfiguration.BAND_2GHZ));
@@ -525,6 +556,12 @@ public class HostapdHal {
                 }
 
                 mSoftApFailureListeners.put(ifaceName, onFailureListener);
+                // Register for vendor lisenters
+                IHostapdVendorIfaceCallback vendorcallback = new HostapdVendorIfaceHalCallback();
+                if(!registerVendorCallback(ifaceParams.ifaceName, mIHostapdVendor, vendorcallback)) {
+                     Log.i(TAG, "Fail to register hostapd vendor Callback.");
+                }
+
                 return true;
             } catch (IllegalArgumentException e) {
                 Log.e(TAG, "Unrecognized apBand: " + band);
@@ -638,6 +675,7 @@ public class HostapdHal {
     private void clearState() {
         synchronized (mLock) {
             mIHostapd = null;
+            mIHostapdVendor = null;
         }
     }
 
@@ -819,6 +857,12 @@ public class HostapdHal {
                 encryptionType = android.hardware.wifi.hostapd.V1_2
                         .IHostapd.EncryptionType.WPA3_SAE;
                 break;
+            case SoftApConfiguration.SECURITY_TYPE_OWE_TRANSITION:
+                encryptionType = VENDOR_ENCRYPTION_TYPE_OWE_TRANSITION;
+                break;
+            case SoftApConfiguration.SECURITY_TYPE_OWE:
+                encryptionType = VENDOR_ENCRYPTION_TYPE_OWE;
+                break;
             default:
                 // We really shouldn't default to None, but this was how NetworkManagementService
                 // used to do this.
@@ -846,6 +890,23 @@ public class HostapdHal {
         }
 
         return bandMask;
+    }
+
+    private static int getHalBandMasks(List<Integer> bands, int defBand) {
+        int bandsSize = bands.size();
+
+        if (bands == null || bandsSize == 0) {
+            return getHalBandMask(defBand);
+        }
+
+        // bit  0-7  for band 1 ... bit 24-31 for band 4
+        int halBands = 0;
+        for (int i = 0; i < bandsSize; i ++) {
+             int apBand = bands.get(i);
+             halBands += (getHalBandMask(apBand) & 0xff) << (8 * i);
+        }
+
+        return halBands;
     }
 
     private static int getHalBand(int apBand) {
@@ -1062,6 +1123,224 @@ public class HostapdHal {
                 Log.d(TAG, "HIDL doesn't support setDebugParams");
             }
             return false;
+        }
+    }
+
+    /**========== Hostpad Vendor HIDL definitions ====================*/
+
+    /**
+     * Death recipient for IHostapdVendor object
+     */
+    private class HostapdVendorDeathRecipient implements DeathRecipient {
+        @Override
+        public void serviceDied(long cookie) {
+            mEventHandler.post(() -> {
+                synchronized (mLock) {
+                    Log.w(TAG, "IHostapdVendor died: cookie=" + cookie);
+                    hostapdServiceDiedHandler(cookie);
+                }
+            });
+        }
+    }
+
+    /**
+     * Link to death for IHostapdVendor object.
+     * @return true on success, false otherwise.
+     */
+    private boolean linkToHostapdVendorDeath() {
+        synchronized (mLock) {
+            if (mIHostapdVendor == null) return false;
+            try {
+                if (!mIHostapdVendor.linkToDeath(mHostapdVendorDeathRecipient, 0)) {
+                    Log.wtf(TAG, "Error on linkToDeath on IHostapdVendor");
+                    hostapdServiceDiedHandler(0);
+                    return false;
+                }
+            } catch (RemoteException e) {
+                Log.e(TAG, "IHostapdVendor.linkToDeath exception", e);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Initialize the IHostapdVendor object.
+     * @return true on success, false otherwise.
+     */
+    public boolean initHostapdVendorService() {
+        synchronized (mLock) {
+            try {
+                mIHostapdVendor = getHostapdVendorMockable();
+            } catch (RemoteException e) {
+                Log.e(TAG, "IHostapdVendor.getService exception: " + e);
+                return false;
+            }
+            if (mIHostapdVendor == null) {
+                Log.e(TAG, "Got null IHostapdVendor service. Stopping hostapdVendor HIDL startup");
+                return false;
+            }
+            if (!linkToHostapdVendorDeath()) {
+                return false;
+            }
+        }
+        return true;
+     }
+
+    @VisibleForTesting
+    protected IHostapdVendor getHostapdVendorMockable() throws RemoteException {
+        synchronized (mLock) {
+            return IHostapdVendor.getService();
+        }
+    }
+
+    /**
+     * Returns false if HostapdVendor is null, and logs failure to call methodStr
+     */
+    private boolean checkHostapdVendorAndLogFailure(String methodStr) {
+        synchronized (mLock) {
+            if (mIHostapdVendor == null) {
+                Log.e(TAG, "Can't call " + methodStr + ", IHostapdVendor is null");
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /**
+     * Returns true if provided status code is SUCCESS, logs debug message and returns false
+     * otherwise
+     */
+    private boolean checkVendorStatusAndLogFailure(HostapdStatus status,
+            String methodStr) {
+        synchronized (mLock) {
+            if (status.code != HostapdStatusCode.SUCCESS) {
+                Log.e(TAG, "IHostapdVendor." + methodStr + " failed: " + status.code
+                        + ", " + status.debugMessage);
+                return false;
+            } else {
+                if (mVerboseLoggingEnabled) {
+                    Log.d(TAG, "IHostapdVendor." + methodStr + " succeeded");
+                }
+                return true;
+            }
+        }
+    }
+
+    public static final class Mutable<E> {
+        public E value;
+
+        public Mutable() {
+            value = null;
+        }
+
+        public Mutable(E value) {
+            this.value = value;
+        }
+    }
+
+    /**
+     * List active hostapd interfaces via HIDL.
+     *
+     * @return true on success, false otherwise.
+     */
+    public ArrayList<String> listInterfaces() {
+        synchronized (mLock) {
+            final String methodStr = "listInterfaces";
+            if (!checkHostapdVendorAndLogFailure(methodStr)) return null;
+            Mutable<ArrayList<String>> ifaceNamesResp = new Mutable<>();
+            try {
+                mIHostapdVendor.listInterfaces(
+                        (HostapdStatus status, ArrayList<String> ifnames) -> {
+                            if (checkVendorStatusAndLogFailure(status, methodStr)) {
+                                ifaceNamesResp.value = ifnames;
+                            }
+                        });
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            }
+            return ifaceNamesResp.value;
+        }
+    }
+
+    /**
+     * Set hostapd commands via HIDL.
+     *
+     * @param cmd to hostapd.
+     * @return true on success, false otherwise.
+     */
+    public String hostapdCmd(@NonNull String ifname, @NonNull String cmd) {
+        synchronized (mLock) {
+            final String methodStr = "hostapdCommand";
+            if (!checkHostapdVendorAndLogFailure(methodStr)) return "";
+            Mutable<String> gotReply = new Mutable<>("");
+            try {
+                mIHostapdVendor.hostapdCmd(ifname, cmd,
+                        (HostapdStatus status, String reply) -> {
+                            if (checkVendorStatusAndLogFailure(status, methodStr)) {
+                                gotReply.value = reply;
+                            }
+                });
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            }
+            return gotReply.value;
+        }
+    }
+
+    // hostapd vendor callback
+    /** WifiNative registered event callbacks */
+    public void registerHalListener(WifiNative.WifiHalListener listener) {
+        mWifiNativeListener = listener;
+    }
+
+    private class HostapdVendorIfaceHalCallback extends IHostapdVendorIfaceCallback.Stub {
+        @Override
+        public void onCtrlEvent(String ifaceName, String eventStr) {
+            Log.i(TAG, ifaceName + ": " + eventStr);
+
+            if (eventStr == null) return;
+            if (mWifiNativeListener == null) return;
+
+            // CTRL-EVENT-THERMAL-CHANGED level=3
+            if (eventStr.startsWith(WifiNative.THERMAL_EVENT_STR)) {
+                Matcher match = WifiNative.THERMAL_PATTERN.matcher(eventStr);
+                 if (match.find()) {
+                     try {
+                         int level = Integer.parseInt(match.group(1));
+                         mWifiNativeListener.onThermalChanged(ifaceName, level);
+                     } catch (NumberFormatException e) {
+                         // not possible..
+                     }
+                 } else {
+                     Log.e(TAG, "Could not parse event=" + eventStr);
+                 }
+            }
+        }
+
+        @Override
+        public void onStaConnected(byte[/* 6 */] bssid) { }
+
+        @Override
+        public void onStaDisconnected(byte[/* 6 */] bssid) { }
+
+        @Override
+        public void onFailure(String ifaceName) { }
+    }
+
+    /** See IHostapdVendor.hal for documentation */
+    private boolean registerVendorCallback(@NonNull String ifaceName,
+            IHostapdVendor service, IHostapdVendorIfaceCallback callback) {
+        synchronized (mLock) {
+            final String methodStr = "registerVendorCallback";
+            if (service == null || callback == null) return false;
+            try {
+                HostapdStatus status =  service.registerVendorCallback_1_3(ifaceName, callback);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+           }
         }
     }
 }
