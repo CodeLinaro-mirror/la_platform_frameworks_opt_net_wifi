@@ -2214,6 +2214,10 @@ public class WifiServiceImpl extends BaseWifiService {
                 () -> mWifiConfigManager.getSavedNetworks(finalTargetConfigUid),
                                Collections.emptyList());
         } else if (staId == STA_SECONDARY) {
+            if (mActiveModeWarden.getQtiClientModeManager() == null) {
+                Log.e(TAG, "getConfiguredNetworks is not allowed for STA2 before turning on it");
+                return null;
+            }
             configs = mWifiThreadRunner.call(
                             () -> mWifiInjector.makeOrGetQtiWifiConfigManager().getSavedNetworks(finalTargetConfigUid),
                                        Collections.emptyList());
@@ -2472,6 +2476,10 @@ public class WifiServiceImpl extends BaseWifiService {
                 + " nid=" + config.networkId
                 + " staId=" + Integer.toString(config.staId));
         if (config.staId == STA_SECONDARY) {
+            if (mActiveModeWarden.getQtiClientModeManager() == null) {
+                Log.e(TAG, "addOrUpdateNetwork is not allowed for STA2 before turning on it");
+                return -1;
+            }
             return mWifiThreadRunner.call(
                 () -> mWifiInjector.makeOrGetQtiWifiConfigManager().addOrUpdateNetwork(config, callingUid, packageName)
                         .getNetworkId(),
