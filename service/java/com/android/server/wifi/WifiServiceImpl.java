@@ -4575,6 +4575,17 @@ public class WifiServiceImpl extends BaseWifiService {
             if (mVerboseLoggingEnabled)
                 Log.d(TAG, "[wifi" + staId + "] network state changed from client mode. netInfo = " + netInfo);
 
+            boolean connected = netInfo != null && netInfo.isConnected();
+
+            if (connected && mClientModeImpl.isConnected() && isDualStaOnSameBand()) {
+                Log.d(TAG, "Disconnect sta2 due to sta1 and sta2 on same band");
+                QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+                if (qtiClientModeImpl == null) {
+                    return;
+                }
+                qtiClientModeImpl.disconnectCommand();
+            }
+
             mQtiWifiNetworkInfo.put(staId, netInfo);
 
             Iterator<IWifiNotificationCallback> iterator =
