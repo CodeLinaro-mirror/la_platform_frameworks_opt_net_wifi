@@ -5868,10 +5868,11 @@ public class QtiClientModeImpl extends StateMachine {
      * active mode: atleast one of the iface is connected and other is looking for connection
      */
     public boolean isDualStaOnSameBand() {
-        if (mWifiNative.mIfaceBands.get(STA_PRIMARY) != WifiNative.ConnectedBand.BAND_NONE
+        if (isConnected() && mWifiNative.mIfaceBands.containsKey(STA_PRIMARY)
+            && mWifiNative.mIfaceBands.containsKey(STA_SECONDARY)
+            && mWifiNative.mIfaceBands.get(STA_PRIMARY) != WifiNative.ConnectedBand.BAND_NONE
             && (mWifiNative.mIfaceBands.get(STA_PRIMARY)
                 == mWifiNative.mIfaceBands.get(STA_SECONDARY))) {
-
             Log.d(TAG, "isDualStaOnSameBand sta1=" + mWifiNative.mIfaceBands.get(STA_PRIMARY)
                   + "sta2=" + mWifiNative.mIfaceBands.get(STA_SECONDARY));
             return true;
