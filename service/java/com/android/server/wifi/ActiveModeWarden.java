@@ -1052,7 +1052,7 @@ public class ActiveModeWarden {
         }
     }
 
-    private QtiClientModeManager getQtiClientModeManager() {
+    public QtiClientModeManager getQtiClientModeManager() {
         for (ActiveModeManager manager : mActiveModeManagers) {
             if (!(manager instanceof QtiClientModeManager)) {
                 continue;
