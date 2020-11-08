@@ -767,7 +767,7 @@ public class QtiClientModeImpl extends StateMachine {
 
         mWifiScoreReport = new WifiScoreReport(mWifiInjector.getScoringParams(), mClock,
                 mWifiMetrics, mWifiInfo, mWifiNative, mBssidBlocklistMonitor,
-                mWifiInjector.getWifiThreadRunner());
+                mWifiInjector.getWifiThreadRunner(), null, null, null, null);
 
         mNetworkCapabilitiesFilter = new NetworkCapabilities.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -2077,9 +2077,9 @@ public class QtiClientModeImpl extends StateMachine {
             case WifiMonitor.NETWORK_CONNECTION_EVENT:
                 s = "NETWORK_CONNECTION_EVENT";
                 break;
-            case WifiMonitor.FILS_NETWORK_CONNECTION_EVENT:
+    /*        case WifiMonitor.FILS_NETWORK_CONNECTION_EVENT:
                 s = "FILS_NETWORK_CONNECTION_EVENT";
-                break;
+                break;	*/
             case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                 s = "NETWORK_DISCONNECTION_EVENT";
                 break;
@@ -4896,11 +4896,11 @@ public class QtiClientModeImpl extends StateMachine {
                                 int rssi = mWifiInfo.getRssi();
                                 int sufficientRssi = mWifiInjector.getScoringParams()
                                         .getSufficientRssi(mWifiInfo.getFrequency());
-                                boolean isLowRssi = rssi < sufficientRssi;
+                               // boolean isLowRssi = rssi < sufficientRssi;
                                 mBssidBlocklistMonitor.handleBssidConnectionFailure(
                                         mLastBssid, config.SSID,
                                         BssidBlocklistMonitor.REASON_NETWORK_VALIDATION_FAILURE,
-                                        isLowRssi);
+                                        rssi);
                                 mWifiScoreCard.noteValidationFailure(mWifiInfo);
                             }
                         }
@@ -4951,10 +4951,10 @@ public class QtiClientModeImpl extends StateMachine {
                         int rssi = mWifiInfo.getRssi();
                         int sufficientRssi = mWifiInjector.getScoringParams()
                                 .getSufficientRssi(mWifiInfo.getFrequency());
-                        boolean isLowRssi = rssi < sufficientRssi;
+                        //boolean isLowRssi = rssi < sufficientRssi;
                         mBssidBlocklistMonitor.handleBssidConnectionFailure(mWifiInfo.getBSSID(),
                                 mWifiInfo.getSSID(),
-                                BssidBlocklistMonitor.REASON_ABNORMAL_DISCONNECT, isLowRssi);
+                                BssidBlocklistMonitor.REASON_ABNORMAL_DISCONNECT, rssi);
                     }
                     config = getCurrentWifiConfiguration();
 
@@ -5591,17 +5591,19 @@ public class QtiClientModeImpl extends StateMachine {
         if ((frameData.mBssTmDataFlagsMask
                 & MboOceConstants.BTM_DATA_FLAG_MBO_ASSOC_RETRY_DELAY_INCLUDED)
                 != 0) {
-            long duration = frameData.mBlackListDurationMs;
+            long duration = 0;
             mWifiMetrics.incrementSteeringRequestCountIncludingMboAssocRetryDelay();
             if (duration == 0) {
                 /*
                  * When MBO assoc retry delay is set to zero(reserved as per spec),
                  * blacklist the BSS for sometime to avoid AP rejecting the re-connect request.
                  */
-                duration = MboOceConstants.DEFAULT_BLACKLIST_DURATION_MS;
+                duration = 300_000;
             }
             // Blacklist the current BSS
-            mBssidBlocklistMonitor.blockBssidForDurationMs(bssid, ssid, duration);
+            int rssi = mWifiInfo.getRssi();
+            mBssidBlocklistMonitor.blockBssidForDurationMs(bssid, ssid, duration,
+		BssidBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT, rssi);
         }
 
         if (frameData.mStatus != MboOceConstants.BTM_RESPONSE_STATUS_ACCEPT) {

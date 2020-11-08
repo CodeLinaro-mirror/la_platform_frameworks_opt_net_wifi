@@ -378,7 +378,7 @@ public class WifiScoreReport {
         mDeviceConfigFacade = deviceConfigFacade;
         mContext = context;
         mFrameworkFacade = frameworkFacade;
-        mHandler = new Handler(looper);
+        // mHandler = new Handler(looper);
         mAdaptiveConnectivityEnabledSettingObserver =
                 new AdaptiveConnectivityEnabledSettingObserver(mHandler);
     }
