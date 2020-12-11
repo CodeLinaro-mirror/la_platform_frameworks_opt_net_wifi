@@ -3162,9 +3162,10 @@ public class WifiNative {
     }
 
     public enum ThermalLevel {
-        THERMAL_LEVEL_FULLPERF,
-        THERMAL_LEVEL_MITIGATION,
-        THERMAL_LEVEL_SHUTDOWN,
+        THERMAL_LEVEL_FULL_PERF,
+        THERMAL_LEVEL_REDUCED_PERF,
+        THERMAL_LEVEL_TX_OFF,
+        THERMAL_LEVEL_SHUT_DOWN,
         THERMAL_LEVEL_UNKNOWN
     }
 
@@ -3173,13 +3174,16 @@ public class WifiNative {
             temperature = temp;
             switch (level) {
                 case 0:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_FULLPERF;
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_FULL_PERF;
                     break;
                 case 2:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_MITIGATION;
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_REDUCED_PERF;
+                    break;
+                case 4:
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_TX_OFF;
                     break;
                 case 5:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_SHUTDOWN;
+                    thermal_level = ThermalLevel.THERMAL_LEVEL_SHUT_DOWN;
                     break;
                 default:
                     thermal_level = ThermalLevel.THERMAL_LEVEL_UNKNOWN;
