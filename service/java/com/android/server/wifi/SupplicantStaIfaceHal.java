@@ -561,6 +561,10 @@ public class SupplicantStaIfaceHal {
                 Log.e(TAG, "ISupplicant.addInterface exception: " + e);
                 handleNoSuchElementException(e, "addInterface");
                 return null;
+            } catch (IllegalArgumentException e) {
+                handleIllegalArgumentException(e, "addInterface");
+                Log.e(TAG, "ISupplicant.addInterface exception: " + e);
+                return null;
             }
             return supplicantIface.value;
         }
@@ -2597,7 +2601,7 @@ public class SupplicantStaIfaceHal {
     private boolean checkStatusAndLogFailure(SupplicantStatus status,
             final String methodStr) {
         synchronized (mLock) {
-            if (status.code != SupplicantStatusCode.SUCCESS) {
+            if (status == null || status.code != SupplicantStatusCode.SUCCESS) {
                 Log.e(TAG, "ISupplicantStaIface." + methodStr + " failed: " + status);
                 return false;
             } else {
@@ -2628,6 +2632,13 @@ public class SupplicantStaIfaceHal {
     }
 
     private void handleRemoteException(RemoteException e, String methodStr) {
+        synchronized (mLock) {
+            clearState();
+            Log.e(TAG, "ISupplicantStaIface." + methodStr + " failed with exception", e);
+        }
+    }
+
+    private void handleIllegalArgumentException(IllegalArgumentException e, String methodStr) {
         synchronized (mLock) {
             clearState();
             Log.e(TAG, "ISupplicantStaIface." + methodStr + " failed with exception", e);

@@ -824,8 +824,13 @@ public class WifiServiceImpl extends BaseWifiService {
             Binder.restoreCallingIdentity(ident);
         }
         if (mWifiPermissionsUtil.checkNetworkSettingsPermission(Binder.getCallingUid())) {
-            mWifiMetrics.logUserActionEvent(enable ? UserActionEvent.EVENT_TOGGLE_WIFI_ON
-                    : UserActionEvent.EVENT_TOGGLE_WIFI_OFF);
+            if (enable) {
+                mWifiMetrics.logUserActionEvent(UserActionEvent.EVENT_TOGGLE_WIFI_ON);
+            } else {
+                WifiInfo wifiInfo = mClientModeImpl.syncRequestConnectionInfo();
+                mWifiMetrics.logUserActionEvent(UserActionEvent.EVENT_TOGGLE_WIFI_OFF,
+                        wifiInfo == null ? -1 : wifiInfo.getNetworkId());
+            }
         }
         mWifiMetrics.incrementNumWifiToggles(isPrivileged, enable);
         if(staId == STA_PRIMARY)
@@ -4259,14 +4264,19 @@ public class WifiServiceImpl extends BaseWifiService {
         if(config != null) staId = config.staId;
         else staId = getIdentityForNetwork(netId);
         if(staId == STA_PRIMARY) {
+            if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+                if (config == null) {
+                    mWifiMetrics.logUserActionEvent(UserActionEvent.EVENT_MANUAL_CONNECT, netId);
+                } else {
+                    mWifiMetrics.logUserActionEvent(
+                            UserActionEvent.EVENT_ADD_OR_UPDATE_NETWORK, config.networkId);
+                }
+            }
             mClientModeImpl.connect(config, netId, binder, callback, callbackIdentifier, uid);
         } else {
             QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
             if (qtiClientModeImpl != null)
                 qtiClientModeImpl.connect(config, netId, binder, callback, callbackIdentifier, uid);
-        }
-        if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
-            mWifiMetrics.logUserActionEvent(UserActionEvent.EVENT_MANUAL_CONNECT, netId);
         }
     }
     /**
@@ -4282,6 +4292,10 @@ public class WifiServiceImpl extends BaseWifiService {
         mLog.info("save uid=%").c(Binder.getCallingUid()).flush();
         int staId = config.staId;
         if(staId == STA_PRIMARY) {
+            if (mWifiPermissionsUtil.checkNetworkSettingsPermission(Binder.getCallingUid())) {
+                mWifiMetrics.logUserActionEvent(
+                        UserActionEvent.EVENT_ADD_OR_UPDATE_NETWORK, config.networkId);
+            }
             mClientModeImpl.save(
                     config, binder, callback, callbackIdentifier, Binder.getCallingUid());
         } else {
