@@ -3145,6 +3145,12 @@ public class WifiNative {
         int iface_type = -1;
         final String kSetTxPowerCmd = "SET_TXPOWER " + dbm;
 
+        //vendor requirement to limit max tx power >= 8dbm.
+        if (dbm < 8) {
+            Log.e(TAG, "Expecting max tx power limit >= 8dbm, while actual dbm=" + dbm);
+            return false;
+        }
+
         synchronized (mLock) {
             Iface iface = mIfaceMgr.getIface(ifname);
             if (iface != null) {
