@@ -22,6 +22,7 @@ import android.util.Pair;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.hotspot2.anqp.ANQPElement;
 import com.android.server.wifi.hotspot2.anqp.Constants;
+import com.android.server.wifi.QtiClientModeManager;
 
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +37,7 @@ import java.util.Set;
 public class PasspointEventHandler {
     private final WifiNative mSupplicantHook;
     private final Callbacks mCallbacks;
+    private QtiClientModeManager mClientModeManager;
 
     /**
      * Interface to be implemented by the client to receive callbacks for passpoint
@@ -71,6 +73,12 @@ public class PasspointEventHandler {
         mCallbacks = callbacks;
     }
 
+    public PasspointEventHandler(WifiNative supplicantHook, Callbacks callbacks, QtiClientModeManager clientModeManager) {
+        mSupplicantHook = supplicantHook;
+        mCallbacks = callbacks;
+        mClientModeManager = clientModeManager;
+    }
+
     /**
      * Request the specified ANQP elements |elements| from the specified AP |bssid|.
      * @param bssid BSSID of the AP
@@ -80,11 +88,20 @@ public class PasspointEventHandler {
     public boolean requestANQP(long bssid, List<Constants.ANQPElementType> elements) {
         Pair<Set<Integer>, Set<Integer>> querySets = buildAnqpIdSet(elements);
         if (bssid == 0 || querySets == null) return false;
-        if (!mSupplicantHook.requestAnqp(
-                mSupplicantHook.getClientInterfaceName(),
-                Utils.macToString(bssid), querySets.first, querySets.second)) {
-            Log.d(Utils.hs2LogTag(getClass()), "ANQP failed on " + Utils.macToString(bssid));
-            return false;
+        if (mClientModeManager != null) {
+            if (!mSupplicantHook.requestAnqp(
+                    mClientModeManager.getInterfaceName(),
+                    Utils.macToString(bssid), querySets.first, querySets.second)) {
+                Log.d(Utils.hs2LogTag(getClass()), "ANQP failed on " + Utils.macToString(bssid));
+                return false;
+            }
+        } else {
+            if (!mSupplicantHook.requestAnqp(
+                    mSupplicantHook.getClientInterfaceName(),
+                    Utils.macToString(bssid), querySets.first, querySets.second)) {
+                Log.d(Utils.hs2LogTag(getClass()), "ANQP failed on " + Utils.macToString(bssid));
+                return false;
+            }
         }
         Log.d(Utils.hs2LogTag(getClass()), "ANQP initiated on " + Utils.macToString(bssid));
         return true;
@@ -98,8 +115,13 @@ public class PasspointEventHandler {
      */
     public boolean requestIcon(long bssid, String fileName) {
         if (bssid == 0 || fileName == null) return false;
-        return mSupplicantHook.requestIcon(
-                mSupplicantHook.getClientInterfaceName(), Utils.macToString(bssid), fileName);
+        if (mClientModeManager != null) {
+            return mSupplicantHook.requestIcon(
+                    mClientModeManager.getInterfaceName(), Utils.macToString(bssid), fileName);
+        } else {
+            return mSupplicantHook.requestIcon(
+                    mSupplicantHook.getClientInterfaceName(), Utils.macToString(bssid), fileName);
+        }
     }
 
     /**

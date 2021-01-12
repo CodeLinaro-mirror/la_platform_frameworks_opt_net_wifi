@@ -744,8 +744,6 @@ public class QtiClientModeImpl extends StateMachine {
         mWifiPermissionsUtil = mWifiInjector.getWifiPermissionsUtil();
         mWifiConfigManager = wifiConfigManager;
 
-        mPasspointManager = mWifiInjector.getPasspointManager();
-
         mWifiMonitor = mWifiInjector.getWifiMonitor();
         mWifiPermissionsWrapper = mWifiInjector.getWifiPermissionsWrapper();
         mWifiDataStall = mWifiInjector.getWifiDataStall();
@@ -753,6 +751,7 @@ public class QtiClientModeImpl extends StateMachine {
         mWifiInfo = new ExtendedWifiInfo(context);
         mSupplicantStateTracker = supplicantStateTracker;
         mQtiWifiConnectivityManager = mWifiInjector.makeQtiWifiConnectivityManager(this, mWifiConfigManager);
+        mPasspointManager = mWifiInjector.getQtiPasspointManager();
         mBssidBlocklistMonitor = mWifiInjector.getBssidBlocklistMonitor();
 
         mLinkProperties = new LinkProperties();
