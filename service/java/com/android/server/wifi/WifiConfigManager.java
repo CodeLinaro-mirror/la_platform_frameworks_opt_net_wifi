@@ -3291,4 +3291,8 @@ public class WifiConfigManager {
     public Comparator<WifiConfiguration> getScanListComparator() {
         return mScanListComparator;
     }
+
+    public WifiConfigStore getWifiConfigStore() {
+        return mWifiConfigStore;
+    }
 }

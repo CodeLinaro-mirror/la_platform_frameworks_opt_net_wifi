@@ -1073,6 +1073,15 @@ public class ActiveModeWarden {
                 ActiveModeManager manager =
                     mWifiInjector.makeQtiClientModeManager(callback);
                 callback.setActiveModeManager(manager);
+                /* The second STA will send ANQP request after find a passpoint supported AP, the ANQP response would received from
+                 * second STA's interface. However, current ANQPRequestManager always choice primary STA's interface to send and
+                 * recieve, so create a new funtion to register a ANQP request manager which would include the QtiClientManager,
+                 * when send ANQP request, the ANQP request function would check whether the ANQP manager it from second STA, then
+                 * it will send ANQP request from second STA's interface.
+                 * Set ANQP request manager here is because QtiPasspointManager create in QtiClientModeManager, we can't get
+                 * QtiClientModeManager instance until QtiClientModeManager created.
+                 */
+                mWifiInjector.getQtiPasspointManager().setANQPRequestManager((QtiClientModeManager)manager);
                 manager.start();
                 manager.setRole(ActiveModeManager.ROLE_CLIENT_SECONDARY);
                 mActiveModeManagers.add(manager);

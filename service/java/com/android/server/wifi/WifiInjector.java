@@ -135,6 +135,7 @@ public class WifiInjector {
     private final WifiPermissionsWrapper mWifiPermissionsWrapper;
     private final WifiPermissionsUtil mWifiPermissionsUtil;
     private final PasspointManager mPasspointManager;
+    private PasspointManager mQtiPasspointManager;
     private HandlerThread mWifiAwareHandlerThread;
     private HandlerThread mRttHandlerThread;
     private HalDeviceManager mHalDeviceManager;
@@ -168,6 +169,8 @@ public class WifiInjector {
             mWifiScanAlwaysAvailableSettingsCompatibility;
     private final SettingsMigrationDataHolder mSettingsMigrationDataHolder;
     private final LruConnectionTracker mLruConnectionTracker;
+    private ClientModeManager mClientModeManager;
+    private QtiClientModeManager mQtiClientModeManager;
 
     public WifiInjector(WifiContext context) {
         if (context == null) {
@@ -527,6 +530,10 @@ public class WifiInjector {
         return mPasspointManager;
     }
 
+    public PasspointManager getQtiPasspointManager() {
+        return mQtiPasspointManager;
+    }
+
     public WakeupController getWakeupController() {
         return mWakeupController;
     }
@@ -537,6 +544,14 @@ public class WifiInjector {
 
     public WifiScoreCard getWifiScoreCard() {
         return mWifiScoreCard;
+    }
+
+    public ClientModeManager getClientModeManager() {
+        return mClientModeManager;
+    }
+
+    public QtiClientModeManager getQtiClientModeManager() {
+        return mQtiClientModeManager;
     }
 
     public TelephonyManager makeTelephonyManager() {
@@ -870,7 +885,6 @@ public class WifiInjector {
                 new NetworkListUserStoreData(mContext),
                 new RandomizedMacStoreData(), mFrameworkFacade, wifiHandler, mDeviceConfigFacade,
                 mWifiScoreCard, mLruConnectionTracker);
-            mQtiWifiConfigManager.loadFromStore();
         }
         return mQtiWifiConfigManager;
     }
@@ -884,9 +898,10 @@ public class WifiInjector {
      * @return a new instance of QtiClientModeManager
      */
     public QtiClientModeManager makeQtiClientModeManager(QtiClientModeManager.Listener listener) {
-        return new QtiClientModeManager(mContext, mWifiHandlerThread.getLooper(), mClock,
-                mWifiNative, listener, this,  mSarManager, mWakeupController,
-                WifiManager.STA_SECONDARY, makeOrGetQtiWifiConfigManager());
+        mQtiClientModeManager =  new QtiClientModeManager(mContext, mWifiHandlerThread.getLooper(), mClock,
+                                  mWifiNative, listener, this,  mSarManager, mWakeupController,
+                                  WifiManager.STA_SECONDARY, makeOrGetQtiWifiConfigManager());
+        return mQtiClientModeManager;
     }
 
     /**
@@ -931,8 +946,13 @@ public class WifiInjector {
         wifiNetworkSelector.registerCandidateScorer(bubbleFunScorer);
         ThroughputScorer throughputScorer = new ThroughputScorer(scoringParams);
         wifiNetworkSelector.registerCandidateScorer(throughputScorer);
+        mQtiPasspointManager = new PasspointManager(mContext, this, new Handler(mWifiHandlerThread.getLooper()),
+                                                    mWifiNative, mWifiKeyStore, mClock, new PasspointObjectFactory(),
+                                                    qtiWifiConfigManager, qtiWifiConfigManager.getWifiConfigStore(),
+                                                    mWifiMetrics, mWifiCarrierInfoManager, WifiManager.STA_SECONDARY,
+                                                    mMacAddressUtil, mWifiPermissionsUtil);
         PasspointNetworkNominateHelper nominateHelper =
-                new PasspointNetworkNominateHelper(mPasspointManager, qtiWifiConfigManager,
+                new PasspointNetworkNominateHelper(mQtiPasspointManager, qtiWifiConfigManager,
                         mConnectivityLocalLog);
         SavedNetworkNominator savedNetworkNominator = new SavedNetworkNominator(
                 qtiWifiConfigManager, nominateHelper, mConnectivityLocalLog, mWifiCarrierInfoManager,

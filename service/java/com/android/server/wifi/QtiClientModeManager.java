@@ -114,6 +114,7 @@ public class QtiClientModeManager implements ActiveModeManager {
         mQtiClientModeImpl = wifiInjector.makeQtiClientModeImpl(mListener, wifiConfigManager);
         mStateMachine = new ClientModeStateMachine(looper);
         mDeferStopHandler = new DeferStopHandler(TAG, looper);
+        wifiConfigManager.loadFromStore();
     }
 
     public QtiClientModeImpl getClientModeImpl() {
@@ -126,6 +127,10 @@ public class QtiClientModeManager implements ActiveModeManager {
 
     public AsyncChannel getClientImplChannel() {
         return mQtiClientModeImplChannel;
+    }
+
+    public String getInterfaceName() {
+        return mClientInterfaceName;
     }
 
     /**
