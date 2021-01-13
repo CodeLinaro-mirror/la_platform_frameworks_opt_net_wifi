@@ -1414,7 +1414,7 @@ public class HalDeviceManager {
         int counter_p2p = 0;
         int counter_nan = 0;
         boolean dual = (SystemProperties.getInt(
-                "persist.vendor.wifi.softap.bands", 0) == 2);
+                "wifi.softap.bands", 0) == 2);
 
         // update counters.
         for (InterfaceCacheEntry entry : mInterfaceInfoCache.values()) {

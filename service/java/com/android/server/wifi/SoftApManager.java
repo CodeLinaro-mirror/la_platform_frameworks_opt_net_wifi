@@ -619,14 +619,14 @@ public class SoftApManager implements ActiveModeManager {
                         }
                         if (bandsize > 0) {
                               try {
-                                  SystemProperties.set("persist.vendor.wifi.softap.bands", Integer.toString(bandsize));
+                                  SystemProperties.set("wifi.softap.bands", Integer.toString(bandsize));
                               } catch (RuntimeException e) {
                                   Log.e(TAG, "Failed to start dual AP - reason=" + e);
                                   return false;
                               }
                         } else {
                               try {
-                                  SystemProperties.set("persist.vendor.wifi.softap.bands", "0");
+                                  SystemProperties.set("wifi.softap.bands", "0");
                               } catch (RuntimeException e) {
                                   // fall through
                               }
