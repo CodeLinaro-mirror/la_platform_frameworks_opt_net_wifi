@@ -192,6 +192,7 @@ public class WifiServiceImpl extends BaseWifiService {
     private final WifiNetworkSuggestionsManager mWifiNetworkSuggestionsManager;
     private final WifiConfigManager mWifiConfigManager;
     private final PasspointManager mPasspointManager;
+    private PasspointManager mQtiPasspointManager;
     private final WifiLog mLog;
     /**
      * Verbose logging flag. Toggled by developer options.
@@ -2926,6 +2927,41 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     /**
+     * Add or update a Passpoint configuration for second STA
+     * @param staId indicate whether use second STA
+     * @return true on success or false on failure
+     * @hide
+     */
+    @Override
+    public boolean addOrUpdatePasspointConfiguration2(
+            PasspointConfiguration config, String packageName, int staId) {
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
+            return false;
+        }
+        int callingUid = Binder.getCallingUid();
+        if (!isTargetSdkLessThanROrPrivileged(
+                packageName, Binder.getCallingPid(), callingUid)) {
+            mLog.info("addOrUpdatePasspointConfiguration not allowed for uid=%")
+                    .c(Binder.getCallingUid()).flush();
+            return false;
+        }
+
+        if (staId == STA_SECONDARY) {
+            mQtiPasspointManager = mWifiInjector.getQtiPasspointManager();
+        }
+
+        if (mQtiPasspointManager == null) {
+            mLog.err("get QtiPasspointManager failed").flush();
+            return false;
+        }
+
+        mLog.info("addorUpdatePasspointConfiguration for second STA uid=%").c(callingUid).flush();
+        return mWifiThreadRunner.call(
+                () -> mQtiPasspointManager.addOrUpdateProvider(config, callingUid, packageName,
+                        false, true), false);
+    }
+
+    /**
      * Remove the Passpoint configuration identified by its FQDN (Fully Qualified Domain Name).
      *
      * @param fqdn The FQDN of the Passpoint configuration to be removed
@@ -2934,6 +2970,15 @@ public class WifiServiceImpl extends BaseWifiService {
     @Override
     public boolean removePasspointConfiguration(String fqdn, String packageName) {
         return removePasspointConfigurationInternal(fqdn, null);
+    }
+
+    /**
+     * Remove the Passpoint configuration identified by its FQDN for secon STA
+     * @hide
+     */
+    @Override
+    public boolean removePasspointConfiguration2(String fqdn, String packageName, int staId) {
+        return removePasspointConfigurationInternal(fqdn, null, STA_SECONDARY);
     }
 
     /**
@@ -2958,6 +3003,30 @@ public class WifiServiceImpl extends BaseWifiService {
                 false);
     }
 
+    private boolean removePasspointConfigurationInternal(String fqdn, String uniqueId, int staId) {
+        final int uid = Binder.getCallingUid();
+        boolean privileged = false;
+        if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
+                || mWifiPermissionsUtil.checkNetworkCarrierProvisioningPermission(uid)) {
+            privileged = true;
+        }
+
+        if (staId == STA_SECONDARY) {
+            mQtiPasspointManager = mWifiInjector.getQtiPasspointManager();
+        }
+
+        if (mQtiPasspointManager == null) {
+            mLog.err("get QtiPasspointManager failed").flush();
+            return false;
+        }
+
+        mLog.info("removePasspointConfigurationInternal uid=%").c(Binder.getCallingUid()).flush();
+        final boolean privilegedFinal = privileged;
+        return mWifiThreadRunner.call(
+                () -> mQtiPasspointManager.removeProvider(uid, privilegedFinal, uniqueId, fqdn),
+                false);
+    }
+
     /**
      * Return the list of the installed Passpoint configurations.
      *
@@ -2979,6 +3048,37 @@ public class WifiServiceImpl extends BaseWifiService {
         final boolean privilegedFinal = privileged;
         return mWifiThreadRunner.call(
             () -> mPasspointManager.getProviderConfigs(uid, privilegedFinal),
+            Collections.emptyList());
+    }
+
+    /**
+     * Return the list of the installed Passpoint configuration for second STA.
+     * @hide
+     */
+    @Override
+    public List<PasspointConfiguration> getPasspointConfigurations2(String packageName, int staId) {
+        final int uid = Binder.getCallingUid();
+        boolean privileged = false;
+        if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
+                || mWifiPermissionsUtil.checkNetworkSetupWizardPermission(uid)) {
+            privileged = true;
+        }
+
+        if (staId == STA_SECONDARY) {
+            mQtiPasspointManager = mWifiInjector.getQtiPasspointManager();
+        }
+
+        if (mQtiPasspointManager == null) {
+            mLog.err("get QtiPasspointManager failed").flush();
+            return null;
+        }
+
+        if (mVerboseLoggingEnabled) {
+            mLog.info("getPasspointConfiguration for second STA uid=%").c(Binder.getCallingUid()).flush();
+        }
+        final boolean privilegedFinal = privileged;
+        return mWifiThreadRunner.call(
+            () -> mQtiPasspointManager.getProviderConfigs(uid, privilegedFinal),
             Collections.emptyList());
     }
 
