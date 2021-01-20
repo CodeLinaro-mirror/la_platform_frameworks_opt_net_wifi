@@ -20,6 +20,7 @@ import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA256;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA384;
+import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
@@ -3537,7 +3538,8 @@ public class ClientModeImpl extends StateMachine {
      * @return boolean true if feature is enabled.
      */
     private boolean isWpa3SaeUpgradeEnabled() {
-        return mContext.getResources().getBoolean(R.bool.config_wifiSaeUpgradeEnabled);
+        return (mContext.getResources().getBoolean(R.bool.config_wifiSaeUpgradeEnabled)) &&
+           ((mWifiNative.getSupportedFeatureSet(mInterfaceName) & WIFI_FEATURE_WPA3_SAE)!=0);
     }
 
     /**
