@@ -32,9 +32,17 @@ import android.net.wifi.WifiManager;
 import android.net.ConnectivityManager;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.hotspot2.pps.Credential;
+import android.net.wifi.hotspot2.pps.HomeSp;
+import android.net.wifi.hotspot2.PasspointConfiguration;
 
+import java.io.*;
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.ArrayList;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import java.security.cert.CertificateFactory;
 import com.android.internal.util.AsyncChannel;
 import android.text.TextUtils;
 import android.os.Process;
@@ -60,6 +68,10 @@ public class WifiSecShellCmd {
     private final Context mContext;
     private final int mStaId;
     private WifiManager mWifiManager;
+    private static HomeSp mHomeSp = new HomeSp();
+    private static Credential mCredential = new Credential();
+    private static Credential.UserCredential mUserCredential = new Credential.UserCredential();
+    private static PasspointConfiguration mPasspointConfiguration = new PasspointConfiguration();;
 
     WifiSecShellCmd(WifiInjector injector) {
         mWifiInjector = injector;
@@ -147,6 +159,132 @@ public class WifiSecShellCmd {
 
     public void status(PrintWriter pw) {
         pw.println("WifiInfo=" + getManager().getConnectionInfo(mStaId));
+    }
+
+    public void setHomeSp(String fqdn, String friendlyName, long[] OSIs) {
+        mHomeSp.setFqdn(fqdn);
+        mHomeSp.setFriendlyName(friendlyName);
+        mHomeSp.setRoamingConsortiumOis(OSIs);
+    }
+
+    public HomeSp getHomeSp(PrintWriter pw) {
+        pw.println("HomeSp is: " + mHomeSp);
+        return mHomeSp;
+    }
+
+    public void setUserCredential(String username, String password, boolean machineManaged, int eap_type, String innerMethod) {
+        mUserCredential.setUsername(username);
+        mUserCredential.setPassword(password);
+        mUserCredential.setMachineManaged(machineManaged);
+        mUserCredential.setEapType(eap_type);
+        mUserCredential.setNonEapInnerMethod(innerMethod);
+    }
+
+    public Credential.UserCredential getUserCredential(PrintWriter pw) {
+        pw.println("UserCredential is: " + mUserCredential);
+        return mUserCredential;
+    }
+
+    private ArrayList<String> readCaFilesFromPath(String path, PrintWriter pw) {
+        ArrayList<String> caFiles = new ArrayList<String>();
+        int i = 0;
+
+        File[] filesList = new File(path).listFiles();
+        for (File file : filesList) {
+            if (file.getName().endsWith(".pem")) {
+                String fileInfo = readFile(file.getAbsolutePath(), pw);
+                if (!fileInfo.equals("")) {
+                    caFiles.add(fileInfo);
+                }
+            }
+        }
+        return caFiles;
+    }
+
+    private String readFile(String path, PrintWriter pw) {
+        StringBuilder buffer = new StringBuilder();
+        int index = 0;
+        try {
+            File filename = new File(path);
+            InputStreamReader in = new InputStreamReader(new FileInputStream(filename));
+            BufferedReader reader = new BufferedReader(in);
+            String line = "";
+            while((line = reader.readLine()) != null) {
+                if (!line.equals("-----BEGIN CERTIFICATE-----") && index == 0) {
+                    pw.println("certificate's format is not match, we can't transfer this format certificate. This certificate begin with: " + line + ", file's path is: " + path);
+                    break;
+                }
+                buffer.append(line + '\n');
+                index++;
+            }
+        } catch (Exception e) {
+            pw.println(e);
+        }
+        return buffer.toString();
+    }
+
+    private String transferPathFormat(String path) {
+        String[] pathes = path.split("\\/");
+        StringBuffer dir = new StringBuffer();
+
+        for (int index = 0; index < pathes.length; index++) {
+            dir.append(pathes[index]);
+            if (index < pathes.length - 1) {
+                dir.append(File.separator);
+            }
+        }
+        return dir.toString();
+    }
+
+    public X509Certificate[] loadCertificates(String path, PrintWriter pw) {
+        ArrayList<X509Certificate> certificateList = new ArrayList<X509Certificate>();
+
+        /* transfer path format to linux readable format. */
+        String dir = transferPathFormat(path);
+
+        /* read all certificates from the path. */
+        ArrayList<String> certs = readCaFilesFromPath(dir, pw);
+
+        try {
+            for (String cert : certs) {
+                CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+                ByteArrayInputStream bytes = new ByteArrayInputStream(cert.getBytes());
+                certificateList.add((X509Certificate) certFactory.generateCertificate(bytes));
+            }
+        } catch (Exception e) {
+            pw.println(e);
+        }
+
+        X509Certificate[] certificates = new X509Certificate[certificateList.size()];
+        for (int index = 0; index < certificateList.size(); index++) {
+            certificates[index] = certificateList.get(index);
+        }
+        return certificates;
+    }
+
+    public void setCredential(String realm, Credential.UserCredential uc, X509Certificate[] cas) {
+        mCredential.setRealm(realm);
+        mCredential.setUserCredential(uc);
+        mCredential.setCaCertificates(cas);
+    }
+
+    public Credential getCredential(PrintWriter pw) {
+        pw.println("Credential is: " + mCredential);
+        return mCredential;
+    }
+
+    public void setPasspointConfiguration(HomeSp sp, Credential cred) {
+        mPasspointConfiguration.setHomeSp(mHomeSp);
+        mPasspointConfiguration.setCredential(mCredential);
+        getManager().addOrUpdatePasspointConfiguration(mPasspointConfiguration, STA_SECONDARY);
+    }
+
+    public List<PasspointConfiguration> getPasspointConfigurations() {
+        return getManager().getPasspointConfigurations(STA_SECONDARY);
+    }
+
+    public void removePasspointConfiguration(String fqdn) {
+        getManager().removePasspointConfiguration(fqdn, STA_SECONDARY);
     }
 
     // Utility API
