@@ -40,6 +40,9 @@ import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.nl80211.WifiNl80211Manager;
+import android.net.wifi.hotspot2.pps.Credential;
+import android.net.wifi.hotspot2.pps.HomeSp;
+import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.os.BasicShellCommandHandler;
 import android.os.Binder;
 import android.os.Process;
@@ -55,9 +58,13 @@ import com.android.server.wifi.util.ScanResultUtil;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,6 +126,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private final ConnectivityManager mConnectivityManager;
     private final WifiCarrierInfoManager mWifiCarrierInfoManager;
     private final WifiSecShellCmd mSecCmd;
+    private HomeSp mHomeSp;
+    private Credential mCredential;
+    private Credential.UserCredential mUserCredential;
+    private static X509Certificate[] mCaCertificates = new X509Certificate[10];
+    private List<PasspointConfiguration> ppcList= new ArrayList<PasspointConfiguration>();
 
     WifiShellCommand(WifiInjector wifiInjector, WifiServiceImpl wifiService, Context context) {
         mClientModeImpl = wifiInjector.getClientModeImpl();
@@ -882,6 +894,94 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 mSecCmd.status(pw);
                 break;
             }
+            case "set-homesp": {
+                String fqdn = getNextArgRequired();
+                String friendlyName = getNextArgRequired();
+                String osi = getNextArg();
+                String[] osiChar = osi.split(",");
+                long[] OSIs = new long[osiChar.length];
+                for (int i = 0; i < osiChar.length; i++) {
+                    OSIs[i] = Long.parseLong(osiChar[i]);
+                }
+                mSecCmd.setHomeSp(fqdn, friendlyName, OSIs);
+                break;
+            }
+            case "get-homesp": {
+                mHomeSp = mSecCmd.getHomeSp(pw);
+                pw.println("In WifiShellCommand, homeSp is " + mHomeSp);
+                break;
+            }
+            case "set-uc": {
+                String username = getNextArgRequired();
+                String password = getNextArg();
+                boolean machineManaged = false;
+                if (getNextArg().equals("enable")) {
+                    machineManaged = true;
+                } else {
+                    machineManaged = false;
+                }
+                int eapType = Integer.parseInt(getNextArg());
+                String innerMethod = getNextArg();
+                mSecCmd.setUserCredential(username, password, machineManaged, eapType, innerMethod);
+                break;
+            }
+            case "get-uc": {
+                mUserCredential = mSecCmd.getUserCredential(pw);
+                pw.println("UserCredential is: " + mUserCredential);
+                break;
+            }
+            case "load-ca": {
+                String path = getNextArgRequired();
+                pw.println("path is: " + path);
+                mCaCertificates = mSecCmd.loadCertificates(path, pw);
+                break;
+            }
+            case "set-cred": {
+                String realm = getNextArgRequired();
+                mUserCredential = mSecCmd.getUserCredential(pw);
+                int index = 0;
+
+                for (X509Certificate cert : mCaCertificates) {
+                    if (cert != null) {
+                        index++;
+                        pw.println("cert is : " );
+                        pw.println(cert);
+                        pw.println("cert end");
+                    } else {
+                        break;
+                    }
+                }
+
+                X509Certificate[] certs = new X509Certificate[index];
+                for (int i = 0; i < index; i++) {
+                    certs[i] = mCaCertificates[i];
+                }
+                mSecCmd.setCredential(realm, mUserCredential, certs);
+                break;
+            }
+            case "get-cred": {
+                mCredential = mSecCmd.getCredential(pw);
+                pw.println("Credential is: " + mCredential);
+                break;
+            }
+            case "set-ppc": {
+                mHomeSp = mSecCmd.getHomeSp(pw);
+                mCredential = mSecCmd.getCredential(pw);
+                mSecCmd.setPasspointConfiguration(mHomeSp, mCredential);
+                break;
+            }
+            case "get-ppc": {
+                ppcList = mSecCmd.getPasspointConfigurations();
+                for (PasspointConfiguration ppc : ppcList) {
+                    pw.println("PasspointConfiguration is: " + ppc);
+                }
+                break;
+            }
+            case "del-ppc": {
+                String fqdn = getNextArgRequired();
+                mSecCmd.removePasspointConfiguration(fqdn);
+                break;
+            }
 /*
             case "": {
                 break;
@@ -927,6 +1027,26 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("     list saved network for secondary");
         pw.println("  status");
         pw.println("     get current status of secondary station");
+        pw.println("  set-homesp <fqdn> <friendlyName> <OSIs>");
+        pw.println("     set Home Service Provider");
+        pw.println("  get-homesp");
+        pw.println("     get Home Service Provider");
+        pw.println("  set-uc <username> <password> <eap_type>");
+        pw.println("     set user Credential");
+        pw.println("  get-uc");
+        pw.println("     get user Credential");
+        pw.println("  load-ca <path>");
+        pw.println("     load the ca certificate from path");
+        pw.println("  set-cred <NAI realm> <uc> <ca>");
+        pw.println("     set credential, uc user credential set by \"svc sec set_uc\", the user credential parameters will stored in a public variable after \"svc sec set_uc\", when set credential, if find parameter is \"uc\", will get the stored parameter from variable");
+        pw.println("  get-cred");
+        pw.println("     get credential");
+        pw.println("  set-ppc <homesp> <credential>");
+        pw.println("     set passpoint configuration");
+        pw.println("  get-ppc");
+        pw.println("     get passpoint configuration");
+        pw.println("  del-ppc <fqdn>");
+        pw.println("     remove passpoint configuration according to fqdn");
         pw.println();
 
         return 0;
