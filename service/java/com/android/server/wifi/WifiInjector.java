@@ -946,4 +946,8 @@ public class WifiInjector {
     public int getVerboseLogging() {
         return mVerboseLoggingEnabled;
     }
+
+    public Context getContext() {
+        return mContext;
+    }
 }
