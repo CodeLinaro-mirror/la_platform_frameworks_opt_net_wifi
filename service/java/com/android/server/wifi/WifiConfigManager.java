@@ -3047,6 +3047,17 @@ public class WifiConfigManager {
             mWifiConfigStore.setUserStores(userStoreFiles);
             mDeferredUserUnlockRead = false;
         }
+        if (mWifiConfigStore.getStaId() == WifiManager.STA_SECONDARY) {
+            Log.d(TAG, "Create user store file before loading from store.");
+            List<WifiConfigStore.StoreFile> userStoreFiles =
+                    WifiConfigStore.createUserFiles(
+                            mCurrentUserId, mFrameworkFacade.isNiapModeOn(mContext),mWifiConfigStore.getStaId());
+            if (userStoreFiles == null) {
+                Log.wtf(TAG, "Failed to create user store files");
+                return false;
+            }
+            mWifiConfigStore.setUserStores(userStoreFiles);
+        }
         try {
             mWifiConfigStore.read();
         } catch (IOException | IllegalStateException e) {
