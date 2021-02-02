@@ -767,7 +767,8 @@ public class QtiClientModeImpl extends StateMachine {
 
         mWifiScoreReport = new WifiScoreReport(mWifiInjector.getScoringParams(), mClock,
                 mWifiMetrics, mWifiInfo, mWifiNative, mBssidBlocklistMonitor,
-                mWifiInjector.getWifiThreadRunner());
+                mWifiInjector.getWifiThreadRunner(), mWifiInjector.getDeviceConfigFacade(),
+                mContext, looper, mFacade);
 
         mNetworkCapabilitiesFilter = new NetworkCapabilities.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
@@ -2076,9 +2077,6 @@ public class QtiClientModeImpl extends StateMachine {
                 break;
             case WifiMonitor.NETWORK_CONNECTION_EVENT:
                 s = "NETWORK_CONNECTION_EVENT";
-                break;
-            case WifiMonitor.FILS_NETWORK_CONNECTION_EVENT:
-                s = "FILS_NETWORK_CONNECTION_EVENT";
                 break;
             case WifiMonitor.NETWORK_DISCONNECTION_EVENT:
                 s = "NETWORK_DISCONNECTION_EVENT";
@@ -4893,14 +4891,10 @@ public class QtiClientModeImpl extends StateMachine {
                                             config.networkId,
                                             DISABLED_NO_INTERNET_TEMPORARY);
                                 }
-                                int rssi = mWifiInfo.getRssi();
-                                int sufficientRssi = mWifiInjector.getScoringParams()
-                                        .getSufficientRssi(mWifiInfo.getFrequency());
-                                boolean isLowRssi = rssi < sufficientRssi;
                                 mBssidBlocklistMonitor.handleBssidConnectionFailure(
                                         mLastBssid, config.SSID,
                                         BssidBlocklistMonitor.REASON_NETWORK_VALIDATION_FAILURE,
-                                        isLowRssi);
+                                        mWifiInfo.getRssi());
                                 mWifiScoreCard.noteValidationFailure(mWifiInfo);
                             }
                         }
@@ -4948,13 +4942,10 @@ public class QtiClientModeImpl extends StateMachine {
                     boolean localGen = message.arg1 == 1;
                     if (!localGen) { // ignore disconnects initiated by wpa_supplicant.
                         mWifiScoreCard.noteNonlocalDisconnect(message.arg2);
-                        int rssi = mWifiInfo.getRssi();
-                        int sufficientRssi = mWifiInjector.getScoringParams()
-                                .getSufficientRssi(mWifiInfo.getFrequency());
-                        boolean isLowRssi = rssi < sufficientRssi;
                         mBssidBlocklistMonitor.handleBssidConnectionFailure(mWifiInfo.getBSSID(),
                                 mWifiInfo.getSSID(),
-                                BssidBlocklistMonitor.REASON_ABNORMAL_DISCONNECT, isLowRssi);
+                                BssidBlocklistMonitor.REASON_ABNORMAL_DISCONNECT,
+                                mWifiInfo.getRssi());
                     }
                     config = getCurrentWifiConfiguration();
 
@@ -5589,19 +5580,24 @@ public class QtiClientModeImpl extends StateMachine {
 
 
         if ((frameData.mBssTmDataFlagsMask
-                & MboOceConstants.BTM_DATA_FLAG_MBO_ASSOC_RETRY_DELAY_INCLUDED)
-                != 0) {
-            long duration = frameData.mBlackListDurationMs;
-            mWifiMetrics.incrementSteeringRequestCountIncludingMboAssocRetryDelay();
+                & MboOceConstants.BTM_DATA_FLAG_DISASSOCIATION_IMMINENT) != 0) {
+            long duration = 0;
+            if ((frameData.mBssTmDataFlagsMask
+                    & MboOceConstants.BTM_DATA_FLAG_MBO_ASSOC_RETRY_DELAY_INCLUDED) != 0) {
+                mWifiMetrics.incrementSteeringRequestCountIncludingMboAssocRetryDelay();
+                duration = frameData.mBlockListDurationMs;
+            }
             if (duration == 0) {
                 /*
-                 * When MBO assoc retry delay is set to zero(reserved as per spec),
-                 * blacklist the BSS for sometime to avoid AP rejecting the re-connect request.
+                 * When disassoc imminent bit alone is set or MBO assoc retry delay is
+                 * set to zero(reserved as per spec), blocklist the BSS for sometime to
+                 * avoid AP rejecting the re-connect request.
                  */
-                duration = MboOceConstants.DEFAULT_BLACKLIST_DURATION_MS;
+                duration = MboOceConstants.DEFAULT_BLOCKLIST_DURATION_MS;
             }
-            // Blacklist the current BSS
-            mBssidBlocklistMonitor.blockBssidForDurationMs(bssid, ssid, duration);
+            // Blocklist the current BSS
+            mBssidBlocklistMonitor.blockBssidForDurationMs(bssid, ssid, duration,
+                    BssidBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_MBO_OCE, 0);
         }
 
         if (frameData.mStatus != MboOceConstants.BTM_RESPONSE_STATUS_ACCEPT) {
