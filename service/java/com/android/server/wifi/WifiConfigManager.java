@@ -478,23 +478,11 @@ public class WifiConfigManager {
      * @return persistent MAC address for this WifiConfiguration
      */
     private MacAddress getPersistentMacAddress(WifiConfiguration config) {
-        // mRandomizedMacAddressMapping had been the location to save randomized MAC addresses.
-        String persistentMacString = mRandomizedMacAddressMapping.get(
-                config.getKey());
-        // Use the MAC address stored in the storage if it exists and is valid. Otherwise
-        // use the MAC address calculated from a hash function as the persistent MAC.
-        if (persistentMacString != null) {
-            try {
-                return MacAddress.fromString(persistentMacString);
-            } catch (IllegalArgumentException e) {
-                Log.e(TAG, "Error creating randomized MAC address from stored value.");
-                mRandomizedMacAddressMapping.remove(config.getKey());
-            }
-        }
-        MacAddress result = mMacAddressUtil.calculatePersistentMac(config.getKey(),
+        String key = config.getKey() + "-staId-" + config.staId;
+        MacAddress result = mMacAddressUtil.calculatePersistentMac(key,
                 mMacAddressUtil.obtainMacRandHashFunction(Process.WIFI_UID));
         if (result == null) {
-            result = mMacAddressUtil.calculatePersistentMac(config.getKey(),
+            result = mMacAddressUtil.calculatePersistentMac(key,
                     mMacAddressUtil.obtainMacRandHashFunction(Process.WIFI_UID));
         }
         if (result == null) {
@@ -505,6 +493,7 @@ public class WifiConfigManager {
                 result = MacAddressUtils.createRandomUnicastAddress();
             }
         }
+        Log.d(TAG, "Got persistent mac address for config=" + key + " mac=" + result);
         return result;
     }
 
@@ -1159,7 +1148,6 @@ public class WifiConfigManager {
         newInternalConfig.noInternetAccessExpected = externalConfig.noInternetAccessExpected;
         newInternalConfig.ephemeral = externalConfig.ephemeral;
         newInternalConfig.osu = externalConfig.osu;
-        newInternalConfig.trusted = externalConfig.trusted;
         newInternalConfig.fromWifiNetworkSuggestion = externalConfig.fromWifiNetworkSuggestion;
         newInternalConfig.fromWifiNetworkSpecifier = externalConfig.fromWifiNetworkSpecifier;
         newInternalConfig.useExternalScores = externalConfig.useExternalScores;
@@ -1828,7 +1816,7 @@ public class WifiConfigManager {
             int disableReason = networkStatus.getNetworkSelectionDisableReason();
             int blockedBssids = Math.min(MAX_BLOCKED_BSSID_PER_NETWORK,
                     mWifiInjector.getBssidBlocklistMonitor()
-                            .getNumBlockedBssidsForSsid(config.SSID));
+                            .updateAndGetNumBlockedBssidsForSsid(config.SSID));
             // if no BSSIDs are blocked then we should keep trying to connect to something
             long disableTimeoutMs = 0;
             if (blockedBssids > 0) {
@@ -2964,13 +2952,21 @@ public class WifiConfigManager {
         Set<Integer> removedNetworkIds = new HashSet<>();
         // Remove any private networks of the old user before switching the userId.
         for (WifiConfiguration config : getConfiguredNetworks()) {
-            if (!config.shared && doesUidBelongToCurrentUser(config.creatorUid)) {
+            if ((!config.shared && doesUidBelongToCurrentUser(config.creatorUid))
+                    || config.ephemeral) {
                 removedNetworkIds.add(config.networkId);
                 localLog("clearInternalUserData: removed config."
                         + " netId=" + config.networkId
                         + " configKey=" + config.getKey());
                 mConfiguredNetworks.remove(config.networkId);
+                for (OnNetworkUpdateListener listener : mListeners) {
+                    listener.onNetworkRemoved(
+                            createExternalWifiConfiguration(config, true, Process.WIFI_UID));
+                }
             }
+        }
+        if (!removedNetworkIds.isEmpty()) {
+            sendConfiguredNetworkChangedBroadcast(WifiManager.CHANGE_REASON_REMOVED);
         }
         mUserTemporarilyDisabledList.clear();
         mScanDetailCaches.clear();
@@ -3118,10 +3114,8 @@ public class WifiConfigManager {
         } catch (IOException | IllegalStateException e) {
             Log.wtf(TAG, "Reading from new store failed. All saved networks are lost!", e);
             return false;
-        } catch (XmlPullParserException e) {
-            Log.wtf(TAG, "XML deserialization of store failed. All saved networks are lost!", e);
-            return false;
-        }
+        } // XmlPullParserException is handled by config store file itself.
+
         loadInternalData(mNetworkListSharedStoreData.getConfigurations(),
                 mNetworkListUserStoreData.getConfigurations(),
                 mRandomizedMacStoreData.getMacMapping());
@@ -3153,11 +3147,8 @@ public class WifiConfigManager {
         } catch (IOException | IllegalStateException e) {
             Log.wtf(TAG, "Reading from new store failed. All saved private networks are lost!", e);
             return false;
-        } catch (XmlPullParserException e) {
-            Log.wtf(TAG, "XML deserialization of store failed. All saved private networks are "
-                    + "lost!", e);
-            return false;
-        }
+        } // XmlPullParserException is handled by config store file itself.
+
         loadInternalDataFromUserStore(mNetworkListUserStoreData.getConfigurations());
         return true;
     }
