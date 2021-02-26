@@ -1434,7 +1434,17 @@ public class WifiNative {
      */
     public Set<String> getSoftApInterfaceNames() {
         synchronized (mLock) {
-            return mIfaceMgr.findAllApIfaceNames();
+            Set<String> maintainedNames = mIfaceMgr.findAllApIfaceNames();
+            Set<String> detailedNames = new ArraySet<>();
+            for (String name : maintainedNames) {
+                if (name.contains("br")) {
+                    ArrayList<String> ifaces = listApInterfaces();
+                    detailedNames.add(name + String.valueOf(ifaces));
+                } else {
+                    detailedNames.add(name);
+                }
+            }
+            return detailedNames;
         }
     }
 
