@@ -1784,15 +1784,17 @@ public class HalDeviceManager {
      * Rules - applies in order:
      *
      * General rules:
+     * 0. Request for STA will destroy P2P (For dual-sta scenario)
      * 1. No interface will be destroyed for a requested interface of the same type
      * 2. No interface will be destroyed if one of the requested interfaces already exists
+     *    (except STA)
      * 3. If there are >1 interface of an existing type, then it is ok to destroy that type
-     *    interface
+     *    interface (except STA)
      *
      * Type-specific rules (but note that the general rules are appied first):
      * 4. Request for AP or STA will destroy any other interface
-     * 5. Request for P2P will destroy NAN-only (but will destroy a second STA per #3)
-     * 6. Request for NAN will destroy P2P-only (but will destroy a second STA per #3)
+     * 5. Request for P2P will destroy NAN-only
+     * 6. Request for NAN will destroy P2P-only
      *
      * Note: the 'numNecessaryInterfaces' is used to specify how many interfaces would be needed to
      * be deleted. This is used to determine whether there are that many low priority interfaces
@@ -1800,18 +1802,25 @@ public class HalDeviceManager {
      */
     private boolean allowedToDeleteIfaceTypeForRequestedType(int existingIfaceType,
             int requestedIfaceType, WifiIfaceInfo[][] currentIfaces, int numNecessaryInterfaces) {
+        // rule 0
+        if (requestedIfaceType == IfaceType.STA) {
+            return existingIfaceType == IfaceType.P2P;
+        }
+
         // rule 1
         if (existingIfaceType == requestedIfaceType) {
             return false;
         }
 
         // rule 2
-        if (currentIfaces[requestedIfaceType].length != 0) {
+        if ((currentIfaces[requestedIfaceType].length != 0)
+            && (requestedIfaceType != IfaceType.STA)) {
             return false;
         }
 
         // rule 3
-        if (currentIfaces[existingIfaceType].length > 1) {
+        if ((currentIfaces[existingIfaceType].length > 1)
+            && (existingIfaceType != IfaceType.STA)) {
             return true;
         }
 
