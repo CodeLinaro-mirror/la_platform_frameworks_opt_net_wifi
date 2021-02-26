@@ -1248,7 +1248,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Note: This only returns whether the app was set via the " +
                 "'network-requests-set-user-approved' shell command");
         pw.println("  qca-list-ifaces");
-        pw.println("    Lists active STA/AP interfaces (could be bridge interfaces)");
+        pw.println("    Lists active STA/AP interfaces (could be bridge interfaces). " +
+                "Command to set bridge iface will only apply to the first internal iface");
         pw.println("  qca-set-txpower <iface> <power in dBm>");
         pw.println("    Sets max txpower in dBm, and <iface> is from 'qca-list-ifaces'");
         pw.println("  qca-set-ani-level <iface> <auto|fixed> [<ofdmlvl>]");
