@@ -737,6 +737,10 @@ public class SupplicantStaIfaceHal {
                 Log.e(TAG, "ISupplicant.addInterface exception: " + e);
                 handleNoSuchElementException(e, "addInterface");
                 return null;
+            } catch (IllegalArgumentException e) {
+                handleIllegalArgumentException(e, "addInterface");
+                Log.e(TAG, "ISupplicant.addInterface exception: " + e);
+                return null;
             }
             return supplicantIface.value;
         }
@@ -963,6 +967,7 @@ public class SupplicantStaIfaceHal {
             linkToSupplicantDeath((cookie) -> {
                 Log.d(TAG, "ISupplicant died: cookie=" + cookie);
                 if (cookie != waitForDeathCookie) return;
+                supplicantServiceDiedHandler(mDeathRecipientCookie);
                 waitForDeathLatch.countDown();
             }, waitForDeathCookie);
 
@@ -2949,7 +2954,7 @@ public class SupplicantStaIfaceHal {
     private boolean checkStatusAndLogFailure(SupplicantStatus status,
             final String methodStr) {
         synchronized (mLock) {
-            if (status.code != SupplicantStatusCode.SUCCESS) {
+            if (status == null || status.code != SupplicantStatusCode.SUCCESS) {
                 Log.e(TAG, "ISupplicantStaIface." + methodStr + " failed: " + status);
                 return false;
             } else {
@@ -3024,6 +3029,13 @@ public class SupplicantStaIfaceHal {
         }
     }
 
+    private void handleIllegalArgumentException(IllegalArgumentException e, String methodStr) {
+        synchronized (mLock) {
+            clearState();
+            Log.e(TAG, "ISupplicantStaIface." + methodStr + " failed with exception", e);
+        }
+    }
+
     /**
      * Converts the Wps config method string to the equivalent enum value.
      */
@@ -3082,16 +3094,9 @@ public class SupplicantStaIfaceHal {
                 WifiSsid wifiSsid = // wifigbk++
                         WifiGbk.createWifiSsidFromByteArray(NativeUtil.byteArrayFromArrayList(ssid));
                 String bssidStr = NativeUtil.macAddressFromByteArray(bssid);
-                mSupplicantStaIfacecallback.updateStateIsFourway(
-                        (newState == ISupplicantStaIfaceCallback.State.FOURWAY_HANDSHAKE));
                 if (newSupplicantState == SupplicantState.COMPLETED) {
-                    if (filsHlpSent == false) {
-                        mWifiMonitor.broadcastNetworkConnectionEvent(
-                                mIfaceName, getCurrentNetworkId(mIfaceName), bssidStr);
-                    } else {
-                        mWifiMonitor.broadcastFilsNetworkConnectionEvent(
-                                mIfaceName, getCurrentNetworkId(mIfaceName), bssidStr);
-                    }
+                    mWifiMonitor.broadcastNetworkConnectionEvent(
+                            mIfaceName, getCurrentNetworkId(mIfaceName), filsHlpSent, bssidStr);
                 }
                 mWifiMonitor.broadcastSupplicantStateChangeEvent(
                         mIfaceName, getCurrentNetworkId(mIfaceName), wifiSsid, bssidStr, newSupplicantState);
