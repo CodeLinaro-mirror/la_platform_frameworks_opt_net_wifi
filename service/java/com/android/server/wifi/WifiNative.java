@@ -3185,6 +3185,22 @@ public class WifiNative {
         return mSupplicantStaIfaceHal.doDriverCmd(ifname, cmd);
     }
 
+    private int getIfaceType(String ifname) {
+        int iface_type = -1;
+        synchronized (mLock) {
+            Iface iface = mIfaceMgr.getIface(ifname);
+            if (iface != null) {
+                iface_type = iface.type;
+            } else { //internal ifaces
+                ArrayList<String> ifaces = listApInterfaces();
+                if (ifaces != null && ifaces.contains(ifname)) {
+                    iface_type = Iface.IFACE_TYPE_AP;
+                }
+            }
+            return iface_type;
+        }
+    }
+
     private boolean setSuccess(String reply) {
         if (reply != null && reply.contains("OK")) {
             return true;
@@ -3199,7 +3215,7 @@ public class WifiNative {
      * @return results of setTxPower
      */
     public boolean setTxPower(String ifname, int dbm) {
-        int iface_type = -1;
+        int iface_type = getIfaceType(ifname);
         final String kSetTxPowerCmd = "SET_TXPOWER " + dbm;
 
         //vendor requirement to limit max tx power >= 8dbm.
@@ -3208,12 +3224,6 @@ public class WifiNative {
             return false;
         }
 
-        synchronized (mLock) {
-            Iface iface = mIfaceMgr.getIface(ifname);
-            if (iface != null) {
-                iface_type = iface.type;
-            }
-        }
         if (iface_type == Iface.IFACE_TYPE_AP) {
             return setSuccess(hapdDriverCmd(ifname, kSetTxPowerCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
@@ -3265,34 +3275,12 @@ public class WifiNative {
      * @return result of set congestion report
      */
     public boolean setCongestionReport(String ifname, int enable, int threshold, int interval) {
-        int iface_type = -1;
+        int iface_type = getIfaceType(ifname);
         final String kSetCongestionReportCmd = "SET_CONGESTION_REPORT "
             + enable + " " + threshold + " " + interval;
-        synchronized (mLock) {
-            Iface iface = mIfaceMgr.getIface(ifname);
-            if (iface != null) {
-                iface_type = iface.type;
-            }
-        }
+
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            if (ifname.contains("br")) {
-                // bridge interface
-                ArrayList<String> ifaces = listApInterfaces();
-                if (ifaces != null && ifaces.size() > 0) {
-                    int index = 0;
-                    boolean ret = true;
-                    while(ret && index < ifaces.size()) {
-                        ret =  ret && setSuccess(mHostapdHal.hostapdCmd(ifaces.get(index),
-                                   "DRIVER " + kSetCongestionReportCmd));
-                        ++index;
-                    }
-                    return ret;
-                } else {
-                    return false;
-                }
-            }
-            return setSuccess(mHostapdHal.hostapdCmd(ifname,
-                       "DRIVER " + kSetCongestionReportCmd));
+            return setSuccess(hapdDriverCmd(ifname, kSetCongestionReportCmd));
         }
         return false;
     }
@@ -3303,15 +3291,9 @@ public class WifiNative {
      * @return thermal temperature and state
      */
     public ThermalInfo getThermalInfo(String ifname) {
-        int iface_type = -1;
+        int iface_type = getIfaceType(ifname);
         final String kGetThermalCmd = "GET_THERMAL_INFO";
 
-        synchronized (mLock) {
-            Iface iface = mIfaceMgr.getIface(ifname);
-            if (iface != null) {
-                iface_type = iface.type;
-            }
-        }
         String reply;
         if (iface_type == Iface.IFACE_TYPE_AP) {
             reply = hapdDriverCmd(ifname, kGetThermalCmd);
@@ -3343,15 +3325,9 @@ public class WifiNative {
      * @return results of setAni
      */
     public boolean setAni(String ifname, int mode, int ofdmlvl) {
-        int iface_type = -1;
+        int iface_type = getIfaceType(ifname);
         final String kSetAniCmd = "SET_ANI_LEVEL " + mode + " " + ofdmlvl;
 
-        synchronized (mLock) {
-            Iface iface = mIfaceMgr.getIface(ifname);
-            if (iface != null) {
-                iface_type = iface.type;
-            }
-        }
         if (iface_type == Iface.IFACE_TYPE_AP) {
             return setSuccess(hapdDriverCmd(ifname, kSetAniCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
