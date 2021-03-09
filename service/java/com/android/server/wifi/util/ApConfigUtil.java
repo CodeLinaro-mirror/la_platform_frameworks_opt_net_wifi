@@ -360,6 +360,32 @@ public class ApConfigUtil {
             return SUCCESS;
         }
 
+        /* For concurrent bands - generate random channels */
+        List<Integer> combined_bands = config.getBands();
+        if (combined_bands != null && combined_bands.size() > 0 && !acsEnabled) {
+            List<Integer> updated_bands = new ArrayList<Integer>();
+            for (int combined : combined_bands) {
+                int band = bandFromCombinedBand(combined);
+                int channel = channelFromCombinedBand(combined);
+                if (channel == 0) {
+                    int freq = chooseApChannel(band, wifiNative, resources);
+                    if (freq == -1) {
+                       /* We're not able to get channel from wificond. */
+                       Log.e(TAG, "Failed to get available channel.");
+                       return ERROR_NO_CHANNEL;
+                    }
+                    channel = ScanResult.convertFrequencyMhzToChannel(freq);
+                }
+                updated_bands.add(bandChannelToCombinedBand(band, channel));
+                Log.i(TAG, "Acs disabled - pick band & channel: "
+                        + band + "&" + channel);
+            }
+            if (updated_bands.size() > 0) {
+                configBuilder.setBands(updated_bands);
+            }
+            return SUCCESS;
+        }
+
         /* Country code is mandatory for 5GHz band. */
         if (config.getBand() == SoftApConfiguration.BAND_5GHZ
                 && countryCode == null) {
@@ -377,9 +403,30 @@ public class ApConfigUtil {
             }
             configBuilder.setChannel(
                     ScanResult.convertFrequencyMhzToChannel(freq), convertFrequencyToBand(freq));
+            Log.i(TAG, "Acs disabled - pick band & channel: "
+                    + convertFrequencyToBand(freq) + "&" + ScanResult.convertFrequencyMhzToChannel(freq));
         }
 
         return SUCCESS;
+    }
+
+    /**
+     * Helper function for combined_band to band/channel
+     * Combined_band:
+     * - Byte1: band. (SoftApConfiguration.BAND_*)
+     * - Byte2: channel (1-255)
+     * - Other: reverted
+     */
+    public static int bandFromCombinedBand(int combined) {
+        return (combined & 0xff);
+    }
+
+    public static int channelFromCombinedBand(int combined) {
+        return (combined >> 8) & 0xff;
+    }
+
+    public static int bandChannelToCombinedBand(int band, int channel) {
+        return (band & 0xff) | ((channel & 0xff) << 8);
     }
 
     /**
@@ -504,6 +551,13 @@ public class ApConfigUtil {
                 R.bool.config_vendor_wifi_softap_owe_supported);
     }
 
+    // This is force ACS from cmd wifi shell, for test purpose.
+    static int mAcsSupported = -1;
+
+    public static void setAcs(boolean enable) {
+        mAcsSupported = enable ? 1 : 0;
+    }
+
     /**
      * Helper function to get ACS support or not.
      *
@@ -511,8 +565,11 @@ public class ApConfigUtil {
      * @return true if supported, false otherwise.
      */
     public static boolean isAcsSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
-                R.bool.config_wifi_softap_acs_supported);
+        if (mAcsSupported == -1) {
+            return context.getResources().getBoolean(
+                    R.bool.config_wifi_softap_acs_supported);
+        }
+        return (mAcsSupported == 1);
     }
 
     /**
