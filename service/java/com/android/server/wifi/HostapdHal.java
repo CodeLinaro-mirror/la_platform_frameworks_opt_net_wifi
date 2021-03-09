@@ -459,8 +459,8 @@ public class HostapdHal {
                 ifaceParams.channelParams.acsShouldExcludeDfs = !mContext.getResources()
                         .getBoolean(R.bool.config_wifiSoftapAcsIncludeDfs);
             }
-            ifaceParams.channelParams.channel =
-                    mForceApChannel ? mForcedApChannel : config.getChannel();
+            ifaceParams.channelParams.channel = getHalChannels(config.getBands(),
+                    mForceApChannel ? mForcedApChannel : config.getChannel());
             band = mForceApChannel ? mForcedApBand : config.getBand();
 
             android.hardware.wifi.hostapd.V1_2.IHostapd.NetworkParams nwParamsV1_2 =
@@ -915,20 +915,35 @@ public class HostapdHal {
     }
 
     private static int getHalBandMasks(List<Integer> bands, int defBand) {
-        int bandsSize = bands.size();
-
-        if (bands == null || bandsSize == 0) {
+        if (bands == null || bands.size() == 0) {
             return getHalBandMask(defBand);
         }
 
         // bit  0-7  for band 1 ... bit 24-31 for band 4
         int halBands = 0;
+        int bandsSize = bands.size();
         for (int i = 0; i < bandsSize; i ++) {
-             int apBand = bands.get(i);
+             int apBand = ApConfigUtil.bandFromCombinedBand(bands.get(i));
              halBands += (getHalBandMask(apBand) & 0xff) << (8 * i);
         }
 
         return halBands;
+    }
+
+    private static int getHalChannels(List<Integer> bands, int defChannel) {
+        if (bands == null || bands.size() == 0) {
+            return defChannel;
+        }
+
+        // bit  0-7  for channel 1 ... bit 24-31 for channel 4
+        int halChannels = 0;
+        int bandsSize = bands.size();
+        for (int i = 0; i < bandsSize; i ++) {
+            int apChannel = ApConfigUtil.channelFromCombinedBand(bands.get(i));
+            halChannels += (apChannel & 0xff) << (8 * i);
+        }
+
+        return halChannels;
     }
 
     private static int getHalBand(int apBand) {
