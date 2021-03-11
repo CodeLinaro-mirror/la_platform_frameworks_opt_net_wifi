@@ -812,10 +812,6 @@ public class QtiClientModeImpl extends StateMachine {
 
         mWifiConfigManager.addOnNetworkUpdateListener(new OnNetworkUpdateListener());
 
-        mDisconnectOnlyOnInitialIpReachability = SystemProperties
-                .get("persist.vendor.wifi.enableIpReachabilityMonitorPeriod", "1")
-                .equals("1");
-
         // CHECKSTYLE:OFF IndentationCheck
         addState(mDefaultState);
             addState(mConnectModeState, mDefaultState);
