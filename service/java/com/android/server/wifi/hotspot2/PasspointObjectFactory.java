@@ -24,6 +24,7 @@ import com.android.server.wifi.WifiCarrierInfoManager;
 import com.android.server.wifi.WifiKeyStore;
 import com.android.server.wifi.WifiMetrics;
 import com.android.server.wifi.WifiNative;
+import com.android.server.wifi.QtiClientModeManager;
 
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -47,6 +48,12 @@ public class PasspointObjectFactory{
     public PasspointEventHandler makePasspointEventHandler(WifiNative wifiNative,
             PasspointEventHandler.Callbacks callbacks) {
         return new PasspointEventHandler(wifiNative, callbacks);
+    }
+
+    public PasspointEventHandler makePasspointEventHandler(WifiNative wifiNative,
+            PasspointEventHandler.Callbacks callbacks,
+            QtiClientModeManager clientModeManager) {
+        return new PasspointEventHandler(wifiNative, callbacks, clientModeManager);
     }
 
     /**
