@@ -42,6 +42,7 @@ import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.hotspot2.IProvisioningCallback;
 import android.net.wifi.hotspot2.OsuProvider;
 import android.net.wifi.hotspot2.PasspointConfiguration;
+import android.net.wifi.ThermalData;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -733,6 +734,11 @@ public class BaseWifiService extends IWifiManager.Stub {
 
     @Override
     public boolean setCongestionReport(String ifname, boolean enable, int threshold, int interval) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ThermalData getThermalInfo(String ifname) {
         throw new UnsupportedOperationException();
     }
 }
