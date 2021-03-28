@@ -119,8 +119,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.AsyncChannel;
 import com.android.net.module.util.Inet4AddressUtils;
 import com.android.server.wifi.WifiNative;
-import com.android.server.wifi.WifiNative.ThermalInfo;
-import com.android.server.wifi.WifiNative.ThermalLevel;
 import com.android.server.wifi.WifiNative.ThermalChangeListener;
 import com.android.server.wifi.WifiNative.CongestionChangeListener;
 import com.android.server.wifi.hotspot2.PasspointManager;
@@ -4868,28 +4866,9 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public ThermalData getThermalInfo(String ifname) {
-        ThermalInfo info = mWifiThreadRunner.call(() ->
+        ThermalData info = mWifiThreadRunner.call(() ->
                 mWifiInjector.getWifiNative().getThermalInfo(ifname), null);
-        if (info == null) return null;
-        ThermalData data = new ThermalData();
-        data.setTemperature(info.temperature);
-        switch (info.thermal_level.toString()) {
-            case "THERMAL_LEVEL_FULL_PERF":
-                data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_FULL_PERF);
-                break;
-            case "THERMAL_LEVEL_REDUCED_PERF":
-                data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_REDUCED_PERF);
-                break;
-            case "THERMAL_LEVEL_TX_OFF":
-                data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_TX_OFF);
-                break;
-            case "THERMAL_LEVEL_SHUT_DOWN":
-                data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_SHUT_DOWN);
-                break;
-            default:
-                data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_UNKNOWN);
-        }
-        return data;
+        return info;
     }
 
     /**

@@ -37,6 +37,7 @@ import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.ThermalData;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
@@ -210,10 +211,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "qca-get-thermal-info": {
                     String ifname = getNextArgRequired();
-                    WifiNative.ThermalInfo thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    ThermalData thermalInfo = mWifiNative.getThermalInfo(ifname);
                     if(thermalInfo != null){
-                        pw.println("temperature: " + thermalInfo.temperature);
-                        pw.println("thermal state: " + thermalInfo.thermal_level);
+                        pw.println("temperature: " + thermalInfo.getTemperature());
+                        pw.println("thermal state: " + thermalInfo.getThermalLevel());
                         return 0;
                     }
                     pw.println("fail to get thermal info");
