@@ -730,4 +730,9 @@ public class BaseWifiService extends IWifiManager.Stub {
     public List<String> getAvailableInterfaces() {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public boolean setCongestionReport(String ifname, boolean enable, int threshold, int interval) {
+        throw new UnsupportedOperationException();
+    }
 }

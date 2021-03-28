@@ -115,6 +115,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.AsyncChannel;
 import com.android.net.module.util.Inet4AddressUtils;
+import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.hotspot2.PasspointProvider;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
@@ -4829,6 +4830,25 @@ public class WifiServiceImpl extends BaseWifiService {
         // post operation to handler thread
         return mWifiThreadRunner.call(() ->
             mWifiInjector.getWifiNative().getAvailableInterfaces(), null);
+    }
+
+    /**
+     * @hide
+     * See {@link android.net.wifi.WifiManager#setCongestionReport(String, boolean, int, int)}
+     */
+    @Override
+    public boolean setCongestionReport(String ifname, boolean enable, int threshold, int interval) {
+        final int ENABLE_INT = 1;
+        final int DISABLE_INT = 0;
+
+        if (enable)
+            return mWifiThreadRunner.call(() ->
+                mWifiInjector.getWifiNative().setCongestionReport(
+                    ifname, ENABLE_INT, threshold, interval), false);
+        else
+            return mWifiThreadRunner.call(() ->
+                mWifiInjector.getWifiNative().setCongestionReport(
+                    ifname, DISABLE_INT, threshold, interval), false);
     }
 
 }
