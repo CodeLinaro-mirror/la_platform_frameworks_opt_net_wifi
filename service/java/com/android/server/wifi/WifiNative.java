@@ -29,6 +29,7 @@ import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
+import android.net.wifi.ThermalData;
 import android.net.wifi.nl80211.DeviceWiphyCapabilities;
 import android.net.wifi.nl80211.NativeScanResult;
 import android.net.wifi.nl80211.RadioChainInfo;
@@ -3273,38 +3274,6 @@ public class WifiNative {
         return false;
     }
 
-    public enum ThermalLevel {
-        THERMAL_LEVEL_FULL_PERF,
-        THERMAL_LEVEL_REDUCED_PERF,
-        THERMAL_LEVEL_TX_OFF,
-        THERMAL_LEVEL_SHUT_DOWN,
-        THERMAL_LEVEL_UNKNOWN
-    }
-
-    public static class ThermalInfo {
-        public ThermalInfo(int temp, int level) {
-            temperature = temp;
-            switch (level) {
-                case 0:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_FULL_PERF;
-                    break;
-                case 2:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_REDUCED_PERF;
-                    break;
-                case 4:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_TX_OFF;
-                    break;
-                case 5:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_SHUT_DOWN;
-                    break;
-                default:
-                    thermal_level = ThermalLevel.THERMAL_LEVEL_UNKNOWN;
-            }
-        }
-        public int temperature;
-        public ThermalLevel thermal_level;
-    }
-
     /**
      * Set congestion report parameter
      * @param ifname Name of the interface
@@ -3329,7 +3298,7 @@ public class WifiNative {
      * @param ifname Name of the interface
      * @return thermal temperature and state
      */
-    public ThermalInfo getThermalInfo(String ifname) {
+    public ThermalData getThermalInfo(String ifname) {
         int iface_type = getIfaceType(ifname);
         final String kGetThermalCmd = "GET_THERMAL_INFO";
 
@@ -3353,7 +3322,25 @@ public class WifiNative {
             Log.e(TAG, "invalid result for get thermal info");
             return null;
         }
-        return new ThermalInfo(info[0], info[1]);
+        ThermalData thermal_data = new ThermalData();
+        thermal_data.setTemperature(info[0]);
+        switch (info[1]) {
+            case 0:
+                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_FULL_PERF);
+                break;
+            case 2:
+                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_REDUCED_PERF);
+                break;
+            case 4:
+                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_TX_OFF);
+                break;
+            case 5:
+                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_SHUT_DOWN);
+                break;
+            default:
+                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_UNKNOWN);
+        }
+        return thermal_data;
     }
 
     /**
