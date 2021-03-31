@@ -710,6 +710,7 @@ public class BaseWifiService extends IWifiManager.Stub {
     public void unregisterForWifiNotification(int staId, int callbackIdentifier) {
         throw new UnsupportedOperationException();
     }
+
     @Override
     public boolean addOrUpdatePasspointConfiguration2(PasspointConfiguration config, String packageName, int staId) {
         throw new UnsupportedOperationException();
@@ -722,6 +723,11 @@ public class BaseWifiService extends IWifiManager.Stub {
 
     @Override
     public List<PasspointConfiguration> getPasspointConfigurations2(String packageName, int staId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<String> getAvailableInterfaces() {
         throw new UnsupportedOperationException();
     }
 }

@@ -1448,6 +1448,35 @@ public class WifiNative {
         }
     }
 
+    /**
+     * Get names of all available interfaces for apps use.
+     *
+     * Note: For bridge interface, it only returns inner managed interfaces.
+     *
+     * @return List of interface name of all active interfaces.
+     */
+    public List<String> getAvailableInterfaces() {
+        synchronized (mLock) {
+            List<String> interfaces = new ArrayList<String>();
+            Set<String> staIfaces = mIfaceMgr.findAllStaIfaceNames();
+            Set<String> apIfaces = mIfaceMgr.findAllApIfaceNames();
+            for (String name : staIfaces) {
+                interfaces.add(name);
+            }
+            for (String name : apIfaces) {
+                if (name.contains("br")) {
+                    List<String> ifaces = listApInterfaces();
+                    for (String innerName : ifaces) {
+                        interfaces.add(innerName);
+                    }
+                } else {
+                    interfaces.add(name);
+                }
+            }
+            return interfaces;
+        }
+    }
+
 
     /********************************************************
      * Wificond operations
