@@ -4822,4 +4822,16 @@ public class WifiServiceImpl extends BaseWifiService {
         return false;
     }
 
+    /**
+     * @hide
+     */
+    @Override
+    public List<String> getAvailableInterfaces() {
+        mLog.info("getAvailableInterfaces uid=%").c(Binder.getCallingUid()).flush();
+
+        // post operation to handler thread
+        return mWifiThreadRunner.call(() ->
+            mWifiInjector.getWifiNative().getAvailableInterfaces(), null);
+    }
+
 }
