@@ -17,6 +17,8 @@
 package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OWE;
+import static android.net.wifi.WifiManager.STA_PRIMARY;
+import static android.net.wifi.WifiManager.STA_SECONDARY;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -317,6 +319,17 @@ public class WifiNative {
                 }
             }
             return ifaceNames;
+        }
+
+        private String findSecondaryStaIfaceName() {
+            for (Iface iface : mIfaces.values()) {
+                if ((iface.type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
+                        || iface.type == Iface.IFACE_TYPE_STA_FOR_SCAN)
+                        && !iface.name.equals("wlan0")) {
+                    return iface.name;
+                }
+            }
+            return null;
         }
 
         private @NonNull Set<String> findAllApIfaceNames() {
@@ -1405,6 +1418,12 @@ public class WifiNative {
         }
     }
 
+    public String getSecondaryStaInterfaceName() {
+        synchronized (mLock) {
+            return mIfaceMgr.findSecondaryStaIfaceName();
+        }
+    }
+
     /**
      * Get name of the softap interface.
      *
@@ -2409,6 +2428,13 @@ public class WifiNative {
     public boolean connectToNetwork(@NonNull String ifaceName, WifiConfiguration configuration) {
         // Abort ongoing scan before connect() to unblock connection request.
         mWifiCondManager.abortScan(ifaceName);
+        if (configuration.staId == STA_PRIMARY && mIfaceBands.containsKey(STA_SECONDARY)) {
+            String SecStaifaceName = getSecondaryStaInterfaceName();
+            if (SecStaifaceName != null) {
+                Log.d(TAG, "Disconnect STA2 for STA1 connection");
+                disconnect(SecStaifaceName);
+            }
+        }
         return mSupplicantStaIfaceHal.connectToNetwork(ifaceName, configuration);
     }
 

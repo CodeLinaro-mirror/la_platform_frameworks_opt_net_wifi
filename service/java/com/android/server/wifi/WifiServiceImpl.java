@@ -3366,14 +3366,15 @@ public class WifiServiceImpl extends BaseWifiService {
                 handleIdleModeChanged();
             } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                boolean connected = networkInfo != null && networkInfo.isConnected();
-
-                if (connected && isDualStaOnSameBand()) {
-                    Log.d(TAG, "Disable sta2 due to sta1 and sta2 on same band");
-                    QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
-                    if (qtiClientModeImpl == null)
-                        return;
-                    qtiClientModeImpl.disconnectCommand();
+                if (networkInfo != null) {
+                    NetworkInfo.DetailedState detailedState = networkInfo.getDetailedState();
+                    if ((detailedState == NetworkInfo.DetailedState.CONNECTED
+                            || detailedState == NetworkInfo.DetailedState.FAILED
+                            || detailedState == NetworkInfo.DetailedState.DISCONNECTED)
+                            && mActiveModeWarden.getQtiClientModeManager() != null) {
+                        Log.d(TAG, "Start scan to reconnect STA2 if possible");
+                        startScan(mContext.getOpPackageName(), mContext.getAttributionTag());
+                    }
                 }
             } else if (action.equals(Intent.ACTION_SHUTDOWN)) {
                 handleShutDown();
