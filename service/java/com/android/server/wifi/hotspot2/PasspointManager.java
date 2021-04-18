@@ -349,7 +349,8 @@ public class PasspointManager {
             WifiConfigStore wifiConfigStore,
             WifiMetrics wifiMetrics,
             WifiCarrierInfoManager wifiCarrierInfoManager,
-            int staId, MacAddressUtil macAddressUtil) {
+            int staId, MacAddressUtil macAddressUtil,
+            WifiPermissionsUtil wifiPermissionsUtil) {
         Log.d(TAG, "Create PasspointManager for " + "[" + staId + "] station");
         mContext = context;
         mWifiInjector = wifiInjector;
@@ -373,6 +374,7 @@ public class PasspointManager {
         mAppOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
         sPasspointManager = this;
         mMacAddressUtil = macAddressUtil;
+        mWifiPermissionsUtil = wifiPermissionsUtil;
     }
 
     public void setANQPRequestManager(QtiClientModeManager clientModeManager) {

@@ -950,7 +950,7 @@ public class WifiInjector {
                                                     mWifiNative, mWifiKeyStore, mClock, new PasspointObjectFactory(),
                                                     qtiWifiConfigManager, qtiWifiConfigManager.getWifiConfigStore(),
                                                     mWifiMetrics, mWifiCarrierInfoManager, WifiManager.STA_SECONDARY,
-                                                    mMacAddressUtil);
+                                                    mMacAddressUtil, mWifiPermissionsUtil);
         PasspointNetworkNominateHelper nominateHelper =
                 new PasspointNetworkNominateHelper(mQtiPasspointManager, qtiWifiConfigManager,
                         mConnectivityLocalLog);
