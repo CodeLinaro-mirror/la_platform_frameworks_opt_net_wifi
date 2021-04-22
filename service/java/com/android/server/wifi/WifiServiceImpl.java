@@ -130,6 +130,7 @@ import com.android.server.wifi.util.RssiUtil;
 import com.android.server.wifi.util.ScanResultUtil;
 import com.android.server.wifi.util.WifiHandler;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.server.wifi.WifiConfigurationUtil;
 import com.android.wifi.resources.R;
 
 import java.io.BufferedReader;
@@ -2453,6 +2454,10 @@ public class WifiServiceImpl extends BaseWifiService {
         }
         mLog.info("addOrUpdateNetwork uid=%").c(Binder.getCallingUid()).flush();
 
+        if (!validateObsoleteEncryptions(config)) {
+            Log.e(TAG, "bad network configuration with obsolete encryption");
+            return -1;
+        }
         if (config == null) {
             Log.e(TAG, "bad network configuration");
             return -1;
@@ -4373,6 +4378,10 @@ public class WifiServiceImpl extends BaseWifiService {
             throw new SecurityException(TAG + ": Permission denied");
         }
         mLog.info("connect uid=%").c(uid).flush();
+        if (!validateObsoleteEncryptions(config)) {
+            Log.e(TAG, "bad configuration, connect abort");
+            return;
+        }
         int staId;
         if(config != null) staId = config.staId;
         else staId = getIdentityForNetwork(netId);
@@ -4393,6 +4402,28 @@ public class WifiServiceImpl extends BaseWifiService {
         }
         mClientModeImpl.connect(config, netId, binder, callback, callbackIdentifier, uid);
     }
+
+    private boolean validateObsoleteEncryptions(WifiConfiguration config) {
+        if (config == null) return true;
+        if (WifiConfigurationUtil.isConfigForWepNetwork(config)) {
+            Log.e(TAG, "Not supported security type WEP");
+            return false;
+        }
+        if (config.allowedPairwiseCiphers != null
+           && config.allowedPairwiseCiphers.get(WifiConfiguration.PairwiseCipher.TKIP)) {
+            Log.e(TAG, "Not supported pairwise cipher: " + WifiConfiguration.PairwiseCipher.TKIP);
+            return false;
+        }
+        if (config.allowedGroupCiphers != null
+             && (config.allowedGroupCiphers.get(WifiConfiguration.GroupCipher.TKIP)
+             || config.allowedGroupCiphers.get(WifiConfiguration.GroupCipher.WEP40)
+             || config.allowedGroupCiphers.get(WifiConfiguration.GroupCipher.WEP104))) {
+            Log.e(TAG, "Not supported group cipher in: " + config.allowedGroupCiphers);
+            return false;
+        }
+        return true;
+    }
+
     /**
      * see {@link android.net.wifi.WifiManager#save(WifiConfiguration,
      * WifiManager.ActionListener)}
@@ -4404,6 +4435,10 @@ public class WifiServiceImpl extends BaseWifiService {
             throw new SecurityException(TAG + ": Permission denied");
         }
         mLog.info("save uid=%").c(Binder.getCallingUid()).flush();
+        if (!validateObsoleteEncryptions(config)) {
+            mLog.err("bad configuration, ignored");
+            return;
+        }
         if (mWifiPermissionsUtil.checkNetworkSettingsPermission(Binder.getCallingUid())) {
             mWifiMetrics.logUserActionEvent(
                     UserActionEvent.EVENT_ADD_OR_UPDATE_NETWORK, config.networkId);
