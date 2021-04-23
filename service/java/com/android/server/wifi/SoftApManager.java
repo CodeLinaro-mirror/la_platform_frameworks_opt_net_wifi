@@ -311,8 +311,10 @@ public class SoftApManager implements ActiveModeManager {
         if (mWifiApConfigStore.getDualSapStatus()) {
             mWifiNative.teardownInterface(mdualApInterfaces[0]);
             mWifiNative.teardownInterface(mdualApInterfaces[1]);
-        }
+            mWifiNative.teardownInterface(mApBrInterfaceName);
+        } else {
             mWifiNative.teardownInterface(mApInterfaceName);
+        }
             Log.d(TAG, "Soft AP is stopped");
     }
     private class SoftApStateMachine extends StateMachine {
