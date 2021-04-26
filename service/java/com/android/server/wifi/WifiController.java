@@ -414,7 +414,9 @@ public class WifiController extends StateMachine {
     class StaEnabledState extends State {
         @Override
         public void enter() {
-            log("StaEnabledState.enter()");
+            log("StaEnabledState.enter(), previous SavedState=" +
+                    mSettingsStore.getWifiSavedState());
+            mSettingsStore.setWifiSavedState(WifiSettingsStore.WIFI_DISABLED);
             mActiveModeWarden.enterClientMode();
         }
 
@@ -423,6 +425,9 @@ public class WifiController extends StateMachine {
             switch (msg.what) {
                 case CMD_WIFI_TOGGLED:
                     if (! mSettingsStore.isWifiToggleEnabled()) {
+                        log("wlan toggled off, previous SavedState=" +
+                                mSettingsStore.getWifiSavedState());
+                        mSettingsStore.setWifiSavedState(WifiSettingsStore.WIFI_DISABLED);
                         if (checkScanOnlyModeAvailable()) {
                             transitionTo(mStaDisabledWithScanState);
                         } else {
