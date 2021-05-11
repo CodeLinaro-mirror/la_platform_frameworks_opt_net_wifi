@@ -51,12 +51,14 @@ import com.android.server.wifi.WifiInjector;
 import com.android.server.wifi.WifiKeyStore;
 import com.android.server.wifi.WifiMetrics;
 import com.android.server.wifi.WifiNative;
+import com.android.server.wifi.QtiClientModeManager;
 import com.android.server.wifi.hotspot2.anqp.ANQPElement;
 import com.android.server.wifi.hotspot2.anqp.Constants;
 import com.android.server.wifi.hotspot2.anqp.HSOsuProvidersElement;
 import com.android.server.wifi.hotspot2.anqp.OsuProviderInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
 import com.android.server.wifi.util.InformationElementUtil;
+import com.android.server.wifi.util.WifiPermissionsUtil;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -107,7 +109,7 @@ public class PasspointManager {
      */
     private static PasspointManager sPasspointManager;
 
-    private final PasspointEventHandler mPasspointEventHandler;
+    private PasspointEventHandler mPasspointEventHandler;
     private final WifiInjector mWifiInjector;
     private final Handler mHandler;
     private final WifiKeyStore mKeyStore;
@@ -115,13 +117,18 @@ public class PasspointManager {
 
     private final Map<String, PasspointProvider> mProviders;
     private final AnqpCache mAnqpCache;
-    private final ANQPRequestManager mAnqpRequestManager;
+    private ANQPRequestManager mAnqpRequestManager;
     private final WifiConfigManager mWifiConfigManager;
     private final WifiMetrics mWifiMetrics;
     private final PasspointProvisioner mPasspointProvisioner;
     private final AppOpsManager mAppOps;
     private final WifiCarrierInfoManager mWifiCarrierInfoManager;
     private final MacAddressUtil mMacAddressUtil;
+    private QtiClientModeManager clientModeManager;
+    private Clock mClock;
+    private Context mContext;
+    private WifiNative mWifiNative;
+    private final WifiPermissionsUtil mWifiPermissionsUtil;
 
     /**
      * Map of package name of an app to the app ops changed listener for the app.
@@ -309,7 +316,8 @@ public class PasspointManager {
             WifiConfigStore wifiConfigStore,
             WifiMetrics wifiMetrics,
             WifiCarrierInfoManager wifiCarrierInfoManager,
-            MacAddressUtil macAddressUtil) {
+            MacAddressUtil macAddressUtil,
+            WifiPermissionsUtil wifiPermissionsUtil) {
         mPasspointEventHandler = objectFactory.makePasspointEventHandler(wifiNative,
                 new CallbackHandler(context));
         mWifiInjector = wifiInjector;
@@ -332,6 +340,47 @@ public class PasspointManager {
         mAppOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
         sPasspointManager = this;
         mMacAddressUtil = macAddressUtil;
+        mWifiPermissionsUtil = wifiPermissionsUtil;
+    }
+
+    public PasspointManager(Context context, WifiInjector wifiInjector, Handler handler,
+            WifiNative wifiNative, WifiKeyStore keyStore, Clock clock,
+            PasspointObjectFactory objectFactory, WifiConfigManager wifiConfigManager,
+            WifiConfigStore wifiConfigStore,
+            WifiMetrics wifiMetrics,
+            WifiCarrierInfoManager wifiCarrierInfoManager,
+            int staId, MacAddressUtil macAddressUtil,
+            WifiPermissionsUtil wifiPermissionsUtil) {
+        Log.d(TAG, "Create PasspointManager for " + "[" + staId + "] station");
+        mContext = context;
+        mWifiInjector = wifiInjector;
+        mHandler = handler;
+        mKeyStore = keyStore;
+        mObjectFactory = objectFactory;
+        mProviders = new HashMap<>();
+        mAnqpCache = objectFactory.makeAnqpCache(clock);
+        mClock = clock;
+        mWifiNative = wifiNative;
+        mWifiConfigManager = wifiConfigManager;
+        mWifiMetrics = wifiMetrics;
+        mProviderIndex = 0;
+        mWifiCarrierInfoManager = wifiCarrierInfoManager;
+        wifiConfigStore.registerStoreData(objectFactory.makePasspointConfigUserStoreData(
+                mKeyStore, mWifiCarrierInfoManager, new UserDataSourceHandler()));
+        wifiConfigStore.registerStoreData(objectFactory.makePasspointConfigSharedStoreData(
+                new SharedDataSourceHandler()));
+        mPasspointProvisioner = objectFactory.makePasspointProvisioner(context, wifiNative,
+                this, wifiMetrics);
+        mAppOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
+        sPasspointManager = this;
+        mMacAddressUtil = macAddressUtil;
+        mWifiPermissionsUtil = wifiPermissionsUtil;
+    }
+
+    public void setANQPRequestManager(QtiClientModeManager clientModeManager) {
+        mPasspointEventHandler = mObjectFactory.makePasspointEventHandler(mWifiNative,
+                new CallbackHandler(mContext), clientModeManager);
+        mAnqpRequestManager = mObjectFactory.makeANQPRequestManager(mPasspointEventHandler, mClock);
     }
 
     /**
@@ -410,6 +459,10 @@ public class PasspointManager {
         }
         if (!(isFromSuggestion || isTrusted)) {
             Log.e(TAG, "Set isTrusted to false on a non suggestion passpoint is not allowed");
+            return false;
+        }
+        if (!mWifiPermissionsUtil.doesUidBelongToCurrentUser(uid)) {
+            Log.e(TAG, "UID " + uid + " not visible to the current user");
             return false;
         }
 
@@ -503,6 +556,10 @@ public class PasspointManager {
         if (!privileged && callingUid != provider.getCreatorUid()) {
             Log.e(TAG, "UID " + callingUid + " cannot remove profile created by "
                     + provider.getCreatorUid());
+            return false;
+        }
+        if (!mWifiPermissionsUtil.doesUidBelongToCurrentUser(callingUid)) {
+            Log.e(TAG, "UID " + callingUid + " not visible to the current user");
             return false;
         }
         provider.uninstallCertsAndKeys();

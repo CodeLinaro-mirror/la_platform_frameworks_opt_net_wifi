@@ -36,10 +36,15 @@ import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.ThermalData;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.nl80211.WifiNl80211Manager;
+import android.net.wifi.hotspot2.pps.Credential;
+import android.net.wifi.hotspot2.pps.HomeSp;
+import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.os.BasicShellCommandHandler;
 import android.os.Binder;
 import android.os.Process;
@@ -55,9 +60,13 @@ import com.android.server.wifi.util.ScanResultUtil;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -118,6 +127,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private final Context mContext;
     private final ConnectivityManager mConnectivityManager;
     private final WifiCarrierInfoManager mWifiCarrierInfoManager;
+    private final WifiSecShellCmd mSecCmd;
+    private HomeSp mHomeSp;
+    private Credential mCredential;
+    private Credential.UserCredential mUserCredential;
+    private static X509Certificate[] mCaCertificates = new X509Certificate[10];
+    private List<PasspointConfiguration> ppcList= new ArrayList<PasspointConfiguration>();
 
     WifiShellCommand(WifiInjector wifiInjector, WifiServiceImpl wifiService, Context context) {
         mClientModeImpl = wifiInjector.getClientModeImpl();
@@ -132,6 +147,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         mContext = context;
         mConnectivityManager = context.getSystemService(ConnectivityManager.class);
         mWifiCarrierInfoManager = wifiInjector.getWifiCarrierInfoManager();
+        mSecCmd = new WifiSecShellCmd(wifiInjector);
     }
 
     @Override
@@ -195,10 +211,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "qca-get-thermal-info": {
                     String ifname = getNextArgRequired();
-                    WifiNative.ThermalInfo thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    ThermalData thermalInfo = mWifiNative.getThermalInfo(ifname);
                     if(thermalInfo != null){
-                        pw.println("temperature: " + thermalInfo.temperature);
-                        pw.println("thermal state: " + thermalInfo.thermal_level);
+                        pw.println("temperature: " + thermalInfo.getTemperature());
+                        pw.println("thermal state: " + thermalInfo.getThermalLevel());
                         return 0;
                     }
                     pw.println("fail to get thermal info");
@@ -428,6 +444,113 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         mHostapdHal.disableForceSoftApChannel();
                         return 0;
                     }
+                }
+                case "qca-softap-start-test" : {
+                   String testName = getNextArgRequired();
+                   String chan_str = null;
+                   String chan_str2 = null;
+                   int ap_state;
+
+                   try {
+                       chan_str = getNextArgRequired();
+                       chan_str2 = getNextArgRequired();
+                   } catch (IllegalArgumentException ignore) { }
+
+                   ap_state = mWifiService.getWifiApEnabledState();
+                   if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                           || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                       if (mWifiService.stopSoftAp()) {
+                           pw.println("Soft AP stopping triggered");
+                       } else {
+                           pw.println("Soft AP failed to stop - retry");
+                           mWifiService.stopSoftAp();
+                       }
+
+                       sleepS(3);
+
+                       ap_state = mWifiService.getWifiApEnabledState();
+                       if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                           || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                           pw.println("Soft AP failed to stop - exit");
+                           return -1;
+                       } else {
+                           pw.println("Soft AP stopped");
+                       }
+                   }
+
+                   ArrayList<Integer> bands = new ArrayList<Integer>();
+
+                   SoftApConfiguration.Builder configBuilder = new SoftApConfiguration.Builder();
+                   configBuilder.setSsid("\"" + testName + "\"");
+                   configBuilder.setPassphrase("12345678", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK);
+
+                   if ("2.4-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       configBuilder.setBand(SoftApConfiguration.BAND_2GHZ);
+                   } else if ("2.4-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                           configBuilder.setChannel(channel, SoftApConfiguration.BAND_2GHZ);
+                       } else {
+                           configBuilder.setBand(SoftApConfiguration.BAND_2GHZ);
+                       }
+                   } else if ("5-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+                   } else if ("5-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                            configBuilder.setChannel(channel, SoftApConfiguration.BAND_5GHZ);
+                       } else {
+                            configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+                       }
+                   } else if ("dual-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       bands.add(SoftApConfiguration.BAND_2GHZ);
+                       bands.add(SoftApConfiguration.BAND_5GHZ);
+                       configBuilder.setBands(bands);
+                   } else if ("dual-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                           bands.add(SoftApConfiguration.BAND_2GHZ | ((channel & 0xff) << 8));
+                           if (chan_str2 != null) {
+                               int channel2 = Integer.parseInt(chan_str2);
+                               bands.add(SoftApConfiguration.BAND_5GHZ | ((channel2 & 0xff) << 8));
+                           } else {
+                               bands.add(SoftApConfiguration.BAND_5GHZ);
+                           }
+                       } else {
+                           bands.add(SoftApConfiguration.BAND_2GHZ);
+                           bands.add(SoftApConfiguration.BAND_5GHZ);
+                       }
+                       configBuilder.setBands(bands);
+                   } else {
+                        pw.println("Invalid argument to 'qca-softap-test'");
+                        return -1;
+                   }
+
+                   SoftApConfiguration config = configBuilder.build();
+                   if (mWifiService.startTetheredHotspot(config)) {
+                       pw.println("Soft AP starting triggered");
+                   } else {
+                       pw.println("Soft AP failed to start. Please check config parameters");
+                       return -1;
+                   }
+
+                   sleepS(3);
+
+                   ap_state = mWifiService.getWifiApEnabledState();
+                   if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                            || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                       pw.println("Soft AP started");
+                   } else {
+                       pw.println("Soft AP failed to start. Please check logcat");
+                      return -1;
+                   }
+                   return 0;
                 }
                 case "start-softap": {
                     SoftApConfiguration config = buildSoftApConfiguration(pw);
@@ -786,6 +909,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     mWifiService.clearWifiConnectedNetworkScorer(); // clear any previous scorer
                     return 0;
                 }
+                case "sec": {
+                    return execSecondaryCommand(pw);
+                }
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -797,6 +923,242 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             e.printStackTrace(pw);
             return -1;
         }
+    }
+
+    private int execSecondaryCommand(PrintWriter pw) throws InterruptedException {
+        String subCmd = getNextArgRequired();
+        switch(subCmd != null ? subCmd : "") {
+            case "enable": {
+                pw.println("Enabling Secondary station");
+                mSecCmd.enable();
+                break;
+            }
+            case "disable": {
+                pw.println("Disabling Secondary station");
+                mSecCmd.disable();
+                break;
+            }
+            case "add-network": {
+                String ssid = getNextArgRequired();
+                String password = getNextArg();
+                pw.println("Add network on Secondary station. ssid="+ssid+ " password="+password);
+                int id = mSecCmd.addNetwork(ssid, password);
+                pw.println(" network id=" + id);
+                break;
+            }
+            case "remove-network": {
+                int netId = Integer.parseInt(getNextArgRequired());
+                pw.println("Remove network on Secondary station id=" + netId);
+                mSecCmd.removeNetwork(netId);
+                break;
+            }
+            case "connect": {
+                String ssid = getNextArgRequired();
+                String password = getNextArg();
+                pw.println("connect on Secondary station ssid=" + ssid);
+                mSecCmd.connectNetwork(ssid, password);
+                break;
+            }
+            case "connect-netId": {
+                int netId = Integer.parseInt(getNextArgRequired());
+                pw.println("connect on Secondary station ssid=" + netId);
+                mSecCmd.connectNetwork(netId);
+                break;
+            }
+            case "disconnect": {
+                pw.println("disconnect on Secondary station");
+               mSecCmd.disconnect();
+                break;
+            }
+            case "forget-network": {
+                int netId = Integer.parseInt(getNextArgRequired());
+                pw.println("forget network on Secondary station id=" + netId);
+                mSecCmd.forgetNetwork(netId);
+                break;
+            }
+            case "save-network": {
+                String ssid = getNextArgRequired();
+                String password = getNextArg();
+                pw.println("save network on Secondary station. ssid="+ssid+ " password="+password);
+                mSecCmd.saveNetwork(ssid, password);
+                break;
+            }
+            case "enable-network": {
+                int netId = Integer.parseInt(getNextArgRequired());
+                pw.println("enable network on Secondary station id=" + netId);
+                mSecCmd.enableNetwork(netId);
+                break;
+            }
+            case "disable-network": {
+                int netId = Integer.parseInt(getNextArgRequired());
+                pw.println("disable network on Secondary station id=" + netId);
+                mSecCmd.disableNetwork(netId);
+                break;
+            }
+            case "list-network": {
+                mSecCmd.listNetwork(pw);
+                break;
+            }
+            case "status": {
+                mSecCmd.status(pw);
+                break;
+            }
+            case "set-homesp": {
+                String fqdn = getNextArgRequired();
+                String friendlyName = getNextArgRequired();
+                String osi = getNextArg();
+                String[] osiChar = osi.split(",");
+                long[] OSIs = new long[osiChar.length];
+                for (int i = 0; i < osiChar.length; i++) {
+                    OSIs[i] = Long.parseLong(osiChar[i]);
+                }
+                mSecCmd.setHomeSp(fqdn, friendlyName, OSIs);
+                break;
+            }
+            case "get-homesp": {
+                mHomeSp = mSecCmd.getHomeSp(pw);
+                pw.println("In WifiShellCommand, homeSp is " + mHomeSp);
+                break;
+            }
+            case "set-uc": {
+                String username = getNextArgRequired();
+                String password = getNextArg();
+                boolean machineManaged = false;
+                if (getNextArg().equals("enable")) {
+                    machineManaged = true;
+                } else {
+                    machineManaged = false;
+                }
+                int eapType = Integer.parseInt(getNextArg());
+                String innerMethod = getNextArg();
+                mSecCmd.setUserCredential(username, password, machineManaged, eapType, innerMethod);
+                break;
+            }
+            case "get-uc": {
+                mUserCredential = mSecCmd.getUserCredential(pw);
+                pw.println("UserCredential is: " + mUserCredential);
+                break;
+            }
+            case "load-ca": {
+                String path = getNextArgRequired();
+                pw.println("path is: " + path);
+                mCaCertificates = mSecCmd.loadCertificates(path, pw);
+                break;
+            }
+            case "set-cred": {
+                String realm = getNextArgRequired();
+                mUserCredential = mSecCmd.getUserCredential(pw);
+                int index = 0;
+
+                for (X509Certificate cert : mCaCertificates) {
+                    if (cert != null) {
+                        index++;
+                        pw.println("cert is : " );
+                        pw.println(cert);
+                        pw.println("cert end");
+                    } else {
+                        break;
+                    }
+                }
+
+                X509Certificate[] certs = new X509Certificate[index];
+                for (int i = 0; i < index; i++) {
+                    certs[i] = mCaCertificates[i];
+                }
+                mSecCmd.setCredential(realm, mUserCredential, certs);
+                break;
+            }
+            case "get-cred": {
+                mCredential = mSecCmd.getCredential(pw);
+                pw.println("Credential is: " + mCredential);
+                break;
+            }
+            case "set-ppc": {
+                mHomeSp = mSecCmd.getHomeSp(pw);
+                mCredential = mSecCmd.getCredential(pw);
+                mSecCmd.setPasspointConfiguration(mHomeSp, mCredential);
+                break;
+            }
+            case "get-ppc": {
+                ppcList = mSecCmd.getPasspointConfigurations();
+                for (PasspointConfiguration ppc : ppcList) {
+                    pw.println("PasspointConfiguration is: " + ppc);
+                }
+                break;
+            }
+            case "del-ppc": {
+                String fqdn = getNextArgRequired();
+                mSecCmd.removePasspointConfiguration(fqdn);
+                break;
+            }
+/*
+            case "": {
+                break;
+            }
+            case "": {
+                break;
+            }
+*/
+            case "help":
+            default:
+                return printSecHelp(pw);
+        }
+        return 0;
+    }
+
+    private int printSecHelp(PrintWriter pw) throws InterruptedException {
+        pw.println("Secondary Wi-Fi (wifi) commands:");
+        pw.println("  help");
+        pw.println("    Print this help text for secondary inteface.");
+        pw.println("  enable");
+        pw.println("    enable's secondary station through wifi controller");
+        pw.println("  disable");
+        pw.println("    disable's secondary station through wifi controller");
+        pw.println("  add-network <SSID> <PSK>");
+        pw.println("     add a new network with SSID and PSK(optional)");
+        pw.println("  save-network <SSID> <PSK>");
+        pw.println("     similar to 'add' but uses SAVE_NETWORK command");
+        pw.println("  remove-network <NET-ID>");
+        pw.println("     remove existing network with id NET-ID");
+        pw.println("  forget-network <NET-ID>");
+        pw.println("     similar to 'remove' but uses FORGET_NETWORK command");
+        pw.println("  connect-netId <NET-ID>");
+        pw.println("     connect to a network with NET-ID");
+        pw.println("  connect <SSID> <PSK>");
+        pw.println("     connect to a network with given ssid and password");
+        pw.println("  disconnect");
+        pw.println("     discconnect existing network");
+        pw.println("  enable-network <NET-ID>");
+        pw.println("     enable a network for connection");
+        pw.println("  disable-network <NET-ID>");
+        pw.println("     disconnect and disable a network for connection");
+        pw.println("  list-network");
+        pw.println("     list saved network for secondary");
+        pw.println("  status");
+        pw.println("     get current status of secondary station");
+        pw.println("  set-homesp <fqdn> <friendlyName> <OSIs>");
+        pw.println("     set Home Service Provider");
+        pw.println("  get-homesp");
+        pw.println("     get Home Service Provider");
+        pw.println("  set-uc <username> <password> <eap_type>");
+        pw.println("     set user Credential");
+        pw.println("  get-uc");
+        pw.println("     get user Credential");
+        pw.println("  load-ca <path>");
+        pw.println("     load the ca certificate from path");
+        pw.println("  set-cred <NAI realm> <uc> <ca>");
+        pw.println("     set credential, uc user credential set by \"svc sec set_uc\", the user credential parameters will stored in a public variable after \"svc sec set_uc\", when set credential, if find parameter is \"uc\", will get the stored parameter from variable");
+        pw.println("  get-cred");
+        pw.println("     get credential");
+        pw.println("  set-ppc <homesp> <credential>");
+        pw.println("     set passpoint configuration");
+        pw.println("  get-ppc");
+        pw.println("     get passpoint configuration");
+        pw.println("  del-ppc <fqdn>");
+        pw.println("     remove passpoint configuration according to fqdn");
+        pw.println();
+
+        return 0;
     }
 
     private boolean getNextArgRequiredTrueOrFalse(String trueString, String falseString)
@@ -1284,5 +1646,14 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         int result;
         result = Integer.parseInt(arg); //migth throw NumberFormatException
         return result;
+    }
+
+    private void sleepS(int sleep_s) {
+        int waitTime = 0;
+        while (waitTime++ < sleep_s) {
+            try {
+                Thread.sleep(1000 /*ms*/);
+            } catch (InterruptedException ignore) {}
+        }
     }
 }
