@@ -889,6 +889,20 @@ public class WifiInjector {
         return mQtiWifiConfigManager;
     }
 
+    /**
+     * Create QtiPasspointManager
+     */
+    public PasspointManager makeOrGetQtiPasspointManager() {
+        if (mQtiPasspointManager == null) {
+            mQtiPasspointManager = new PasspointManager(
+                    mContext, this, new Handler(mWifiHandlerThread.getLooper()),
+                    mWifiNative, mWifiKeyStore, mClock, new PasspointObjectFactory(),
+                    makeOrGetQtiWifiConfigManager(), mQtiWifiConfigManager.getWifiConfigStore(),
+                    mWifiMetrics, mWifiCarrierInfoManager, WifiManager.STA_SECONDARY,
+                    mMacAddressUtil, mWifiPermissionsUtil);
+        }
+        return mQtiPasspointManager;
+    }
 
     /**
      * Create a QtiClientModeManager
@@ -946,14 +960,10 @@ public class WifiInjector {
         wifiNetworkSelector.registerCandidateScorer(bubbleFunScorer);
         ThroughputScorer throughputScorer = new ThroughputScorer(scoringParams);
         wifiNetworkSelector.registerCandidateScorer(throughputScorer);
-        mQtiPasspointManager = new PasspointManager(mContext, this, new Handler(mWifiHandlerThread.getLooper()),
-                                                    mWifiNative, mWifiKeyStore, mClock, new PasspointObjectFactory(),
-                                                    qtiWifiConfigManager, qtiWifiConfigManager.getWifiConfigStore(),
-                                                    mWifiMetrics, mWifiCarrierInfoManager, WifiManager.STA_SECONDARY,
-                                                    mMacAddressUtil, mWifiPermissionsUtil);
+
         PasspointNetworkNominateHelper nominateHelper =
-                new PasspointNetworkNominateHelper(mQtiPasspointManager, qtiWifiConfigManager,
-                        mConnectivityLocalLog);
+                new PasspointNetworkNominateHelper(makeOrGetQtiPasspointManager(),
+                        qtiWifiConfigManager, mConnectivityLocalLog);
         SavedNetworkNominator savedNetworkNominator = new SavedNetworkNominator(
                 qtiWifiConfigManager, nominateHelper, mConnectivityLocalLog, mWifiCarrierInfoManager,
                 mWifiPermissionsUtil, mWifiNetworkSuggestionsManager);
