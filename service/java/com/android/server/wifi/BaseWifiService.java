@@ -42,6 +42,8 @@ import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.hotspot2.IProvisioningCallback;
 import android.net.wifi.hotspot2.OsuProvider;
 import android.net.wifi.hotspot2.PasspointConfiguration;
+import android.net.wifi.ThermalData;
+import android.net.wifi.IWifiNativeEventCallback;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -710,6 +712,7 @@ public class BaseWifiService extends IWifiManager.Stub {
     public void unregisterForWifiNotification(int staId, int callbackIdentifier) {
         throw new UnsupportedOperationException();
     }
+
     @Override
     public boolean addOrUpdatePasspointConfiguration2(PasspointConfiguration config, String packageName, int staId) {
         throw new UnsupportedOperationException();
@@ -722,6 +725,31 @@ public class BaseWifiService extends IWifiManager.Stub {
 
     @Override
     public List<PasspointConfiguration> getPasspointConfigurations2(String packageName, int staId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<String> getAvailableInterfaces() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean setCongestionReport(String ifname, boolean enable, int threshold, int interval) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ThermalData getThermalInfo(String ifname) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void registerWifiNativeEventCallback(IWifiNativeEventCallback callback) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void unregisterWifiNativeEventCallback(IWifiNativeEventCallback callback) {
         throw new UnsupportedOperationException();
     }
 }

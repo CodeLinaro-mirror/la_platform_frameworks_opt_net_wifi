@@ -36,6 +36,8 @@ import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
+import android.net.wifi.ThermalData;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
@@ -209,10 +211,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "qca-get-thermal-info": {
                     String ifname = getNextArgRequired();
-                    WifiNative.ThermalInfo thermalInfo = mWifiNative.getThermalInfo(ifname);
+                    ThermalData thermalInfo = mWifiNative.getThermalInfo(ifname);
                     if(thermalInfo != null){
-                        pw.println("temperature: " + thermalInfo.temperature);
-                        pw.println("thermal state: " + thermalInfo.thermal_level);
+                        pw.println("temperature: " + thermalInfo.getTemperature());
+                        pw.println("thermal state: " + thermalInfo.getThermalLevel());
                         return 0;
                     }
                     pw.println("fail to get thermal info");
@@ -442,6 +444,113 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         mHostapdHal.disableForceSoftApChannel();
                         return 0;
                     }
+                }
+                case "qca-softap-start-test" : {
+                   String testName = getNextArgRequired();
+                   String chan_str = null;
+                   String chan_str2 = null;
+                   int ap_state;
+
+                   try {
+                       chan_str = getNextArgRequired();
+                       chan_str2 = getNextArgRequired();
+                   } catch (IllegalArgumentException ignore) { }
+
+                   ap_state = mWifiService.getWifiApEnabledState();
+                   if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                           || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                       if (mWifiService.stopSoftAp()) {
+                           pw.println("Soft AP stopping triggered");
+                       } else {
+                           pw.println("Soft AP failed to stop - retry");
+                           mWifiService.stopSoftAp();
+                       }
+
+                       sleepS(3);
+
+                       ap_state = mWifiService.getWifiApEnabledState();
+                       if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                           || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                           pw.println("Soft AP failed to stop - exit");
+                           return -1;
+                       } else {
+                           pw.println("Soft AP stopped");
+                       }
+                   }
+
+                   ArrayList<Integer> bands = new ArrayList<Integer>();
+
+                   SoftApConfiguration.Builder configBuilder = new SoftApConfiguration.Builder();
+                   configBuilder.setSsid("\"" + testName + "\"");
+                   configBuilder.setPassphrase("12345678", SoftApConfiguration.SECURITY_TYPE_WPA2_PSK);
+
+                   if ("2.4-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       configBuilder.setBand(SoftApConfiguration.BAND_2GHZ);
+                   } else if ("2.4-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                           configBuilder.setChannel(channel, SoftApConfiguration.BAND_2GHZ);
+                       } else {
+                           configBuilder.setBand(SoftApConfiguration.BAND_2GHZ);
+                       }
+                   } else if ("5-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+                   } else if ("5-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                            configBuilder.setChannel(channel, SoftApConfiguration.BAND_5GHZ);
+                       } else {
+                            configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+                       }
+                   } else if ("dual-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(true);
+                       bands.add(SoftApConfiguration.BAND_2GHZ);
+                       bands.add(SoftApConfiguration.BAND_5GHZ);
+                       configBuilder.setBands(bands);
+                   } else if ("dual-non-acs".equals(testName)) {
+                       ApConfigUtil.setAcs(false);
+                       if (chan_str != null) {
+                           int channel = Integer.parseInt(chan_str);
+                           bands.add(SoftApConfiguration.BAND_2GHZ | ((channel & 0xff) << 8));
+                           if (chan_str2 != null) {
+                               int channel2 = Integer.parseInt(chan_str2);
+                               bands.add(SoftApConfiguration.BAND_5GHZ | ((channel2 & 0xff) << 8));
+                           } else {
+                               bands.add(SoftApConfiguration.BAND_5GHZ);
+                           }
+                       } else {
+                           bands.add(SoftApConfiguration.BAND_2GHZ);
+                           bands.add(SoftApConfiguration.BAND_5GHZ);
+                       }
+                       configBuilder.setBands(bands);
+                   } else {
+                        pw.println("Invalid argument to 'qca-softap-test'");
+                        return -1;
+                   }
+
+                   SoftApConfiguration config = configBuilder.build();
+                   if (mWifiService.startTetheredHotspot(config)) {
+                       pw.println("Soft AP starting triggered");
+                   } else {
+                       pw.println("Soft AP failed to start. Please check config parameters");
+                       return -1;
+                   }
+
+                   sleepS(3);
+
+                   ap_state = mWifiService.getWifiApEnabledState();
+                   if (ap_state == WifiManager.WIFI_AP_STATE_ENABLED
+                            || ap_state == WifiManager.WIFI_AP_STATE_ENABLING) {
+                       pw.println("Soft AP started");
+                   } else {
+                       pw.println("Soft AP failed to start. Please check logcat");
+                      return -1;
+                   }
+                   return 0;
                 }
                 case "start-softap": {
                     SoftApConfiguration config = buildSoftApConfiguration(pw);
@@ -1537,5 +1646,14 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         int result;
         result = Integer.parseInt(arg); //migth throw NumberFormatException
         return result;
+    }
+
+    private void sleepS(int sleep_s) {
+        int waitTime = 0;
+        while (waitTime++ < sleep_s) {
+            try {
+                Thread.sleep(1000 /*ms*/);
+            } catch (InterruptedException ignore) {}
+        }
     }
 }

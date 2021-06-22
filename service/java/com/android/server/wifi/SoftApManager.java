@@ -412,12 +412,7 @@ public class SoftApManager implements ActiveModeManager {
         SoftApConfiguration.Builder localConfigBuilder = new SoftApConfiguration.Builder(config);
 
         boolean acsEnabled = mCurrentSoftApCapability.areFeaturesSupported(
-                SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD);
-        // Concurrent BSSes requires ACS to be enabled.
-        if (config.getBands().size() > 1 && !acsEnabled) {
-             Log.i(TAG, "Unable to start concurrent soft AP without acs - ovewrite it");
-             acsEnabled = true;
-        }
+                SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD) && ApConfigUtil.isAcsSupported(mContext);
 
         result = ApConfigUtil.updateApChannelConfig(
                 mWifiNative, mContext.getResources(), mCountryCode, localConfigBuilder, config,
