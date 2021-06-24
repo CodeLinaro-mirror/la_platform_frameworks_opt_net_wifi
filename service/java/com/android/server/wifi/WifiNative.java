@@ -3134,18 +3134,18 @@ public class WifiNative {
     }
 
     private class WifiNativeHalListener implements WifiHalListener {
+        int mLastThermalLevel = ThermalData.THERMAL_INFO_LEVEL_UNKNOWN;
         @Override
         public void onThermalChanged(String ifname, int thermal_state) {
             synchronized (mThermalListeners) {
+                thermal_state = toFrameworkThermalLevel(thermal_state);
                 // Reduce duplicate Thermal change event report.
-                Iface iface = mIfaceMgr.findAnyIfaceOfType(Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY);
-                String staIfname = (iface != null) ? iface.name : null;
-                if (staIfname != null && !staIfname.equals(ifname)) {
-                    Log.d(TAG, "ignore duplicate report thermal in other ifaces - " + ifname);
+                if (thermal_state == mLastThermalLevel) {
+                    Log.d(TAG, "ignore duplicate report thermal with same level " + thermal_state);
                     return;
                 }
+                mLastThermalLevel = thermal_state;
 
-                thermal_state = toFrameworkThermalLevel(thermal_state);
                 // Put into log events
                 SimpleDateFormat formatter= new SimpleDateFormat("MM-dd HH:mm:ss.S");
                 Date date = new Date(System.currentTimeMillis());
