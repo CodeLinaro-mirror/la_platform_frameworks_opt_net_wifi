@@ -3221,6 +3221,29 @@ public class WifiNative {
         return mHostapdHal.hostapdCmd(ifname, "DRIVER " + cmd);
     }
 
+    //Used for cmds requiring all internal ifaces to set when bridge
+    //iface is set
+    public String hapdDriverCmd2(String ifname, String cmd) {
+        String reply = "";
+        if (ifname.contains("br")) {
+            // bridge interface
+            ArrayList<String> ifaces = listApInterfaces();
+            if (ifaces != null && ifaces.size() > 0) {
+                for (String iface : ifaces) {
+                    reply = mHostapdHal.hostapdCmd(iface, "DRIVER " + cmd);
+                    if (!reply.contains("OK")) {
+                        return reply;
+                    }
+                }
+            } else {
+                reply = "iface not ready";
+            }
+        } else {
+            reply = mHostapdHal.hostapdCmd(ifname, "DRIVER " + cmd);
+        }
+        return reply;
+    }
+
     public String wpaDriverCmd(String ifname, String cmd) {
         return mSupplicantStaIfaceHal.doDriverCmd(ifname, cmd);
     }
@@ -3265,7 +3288,7 @@ public class WifiNative {
         }
 
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            return setSuccess(hapdDriverCmd(ifname, kSetTxPowerCmd));
+            return setSuccess(hapdDriverCmd2(ifname, kSetTxPowerCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
                    || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
             return setSuccess(wpaDriverCmd(ifname, kSetTxPowerCmd));
@@ -3355,7 +3378,7 @@ public class WifiNative {
         final String kSetAniCmd = "SET_ANI_LEVEL " + mode + " " + ofdmlvl;
 
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            return setSuccess(hapdDriverCmd(ifname, kSetAniCmd));
+            return setSuccess(hapdDriverCmd2(ifname, kSetAniCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
                    || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
             return setSuccess(wpaDriverCmd(ifname, kSetAniCmd));
