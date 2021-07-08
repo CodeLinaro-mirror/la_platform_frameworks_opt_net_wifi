@@ -20,6 +20,7 @@ import static android.net.wifi.WifiInfo.INVALID_RSSI;
 
 import static androidx.core.util.Preconditions.checkNotNull;
 
+import static com.android.wifitrackerlib.Utils.getSingleSecurityTypeFromMultipleSecurityTypes;
 import static com.android.wifitrackerlib.Utils.getSpeedFromWifiInfo;
 
 import android.net.LinkAddress;
@@ -51,6 +52,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringJoiner;
@@ -242,7 +244,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
     protected boolean mCalledDisconnect = false;
 
     private boolean mIsValidated;
-    private boolean mIsDefaultNetwork;
+    protected boolean mIsDefaultNetwork;
     protected boolean mIsLowQuality;
 
     private Optional<ManageSubscriptionAction> mManageSubscriptionAction = Optional.empty();
@@ -362,10 +364,45 @@ public class WifiEntry implements Comparable<WifiEntry> {
         return null;
     }
 
-    /** Returns the security type defined by the SECURITY constants */
+    /**
+     * Returns the security type defined by the SECURITY constants
+     * DEPRECATED: Use getSecurityTypes() which can return multiple security types.
+     */
+    // TODO(b/187554920): Remove this and move all clients to getSecurityTypes()
     @Security
     public int getSecurity() {
-        return SECURITY_NONE;
+        switch (getSingleSecurityTypeFromMultipleSecurityTypes(getSecurityTypes())) {
+            case WifiInfo.SECURITY_TYPE_OPEN:
+                return SECURITY_NONE;
+            case WifiInfo.SECURITY_TYPE_OWE:
+                return SECURITY_OWE;
+            case WifiInfo.SECURITY_TYPE_WEP:
+                return SECURITY_WEP;
+            case WifiInfo.SECURITY_TYPE_PSK:
+                return SECURITY_PSK;
+            case WifiInfo.SECURITY_TYPE_SAE:
+                return SECURITY_SAE;
+            case WifiInfo.SECURITY_TYPE_EAP:
+                return SECURITY_EAP;
+            case WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE:
+                return SECURITY_EAP_WPA3_ENTERPRISE;
+            case WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE_192_BIT:
+                return SECURITY_EAP_SUITE_B;
+            case WifiInfo.SECURITY_TYPE_PASSPOINT_R1_R2:
+            case WifiInfo.SECURITY_TYPE_PASSPOINT_R3:
+                return SECURITY_EAP;
+            default:
+                return SECURITY_NONE;
+        }
+    }
+
+    /**
+     * Returns security type of the current connection, or the available types for connection
+     * in the form of the SECURITY_TYPE_* values in {@link WifiInfo}
+     */
+    @NonNull
+    public List<Integer> getSecurityTypes() {
+        return Collections.emptyList();
     }
 
     /** Returns the MAC address of the connection */
@@ -801,6 +838,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
                 mConnectedInfo.wifiStandard = wifiInfo.getWifiStandard();
             }
         } else { // Connection info doesn't matched, so this network is disconnected
+            mWifiInfo = null;
             mNetworkInfo = null;
             mNetworkCapabilities = null;
             mConnectedInfo = null;
@@ -817,7 +855,14 @@ public class WifiEntry implements Comparable<WifiEntry> {
                 });
             }
         }
+        updateSecurityTypes();
         notifyOnUpdated();
+    }
+
+    // Called to indicate the security types should be updated to match new information about the
+    // network.
+    protected void updateSecurityTypes() {
+        // Do nothing;
     }
 
     // Method for WifiTracker to update the link properties, which is valid for all WifiEntry types.
@@ -1003,7 +1048,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
                 .append(getLevel())
                 .append(shouldShowXLevelIcon() ? "X" : "")
                 .append(",security:")
-                .append(getSecurity())
+                .append(getSecurityTypes())
                 .append(",standard:")
                 .append(getWifiStandard())
                 .append(",he8ssAp:")
