@@ -3366,14 +3366,15 @@ public class WifiServiceImpl extends BaseWifiService {
                 handleIdleModeChanged();
             } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-                boolean connected = networkInfo != null && networkInfo.isConnected();
-
-                if (connected && isDualStaOnSameBand()) {
-                    Log.d(TAG, "Disable sta2 due to sta1 and sta2 on same band");
-                    QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
-                    if (qtiClientModeImpl == null)
-                        return;
-                    qtiClientModeImpl.disconnectCommand();
+                if (networkInfo != null) {
+                    NetworkInfo.DetailedState detailedState = networkInfo.getDetailedState();
+                    if ((detailedState == NetworkInfo.DetailedState.CONNECTED
+                            || detailedState == NetworkInfo.DetailedState.FAILED
+                            || detailedState == NetworkInfo.DetailedState.DISCONNECTED)
+                            && mActiveModeWarden.getQtiClientModeManager() != null) {
+                        Log.d(TAG, "Start scan to reconnect STA2 if possible");
+                        startScan(mContext.getOpPackageName(), mContext.getAttributionTag());
+                    }
                 }
             } else if (action.equals(Intent.ACTION_SHUTDOWN)) {
                 handleShutDown();
@@ -3691,9 +3692,17 @@ public class WifiServiceImpl extends BaseWifiService {
         List<WifiConfiguration> networks = mWifiThreadRunner.call(
                 () -> mWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
                 Collections.emptyList());
+
+        WifiConfigManager qtiWifiConfigManager = mWifiInjector.makeOrGetQtiWifiConfigManager();
+
+        networks.addAll(networks.size(), mWifiThreadRunner.call(
+                () ->qtiWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
+                Collections.emptyList()));
+
         for (WifiConfiguration network : networks) {
             removeNetwork(network.networkId, packageName);
         }
+
         // Delete all Passpoint configurations
         List<PasspointConfiguration> configs = mWifiThreadRunner.call(
                 () -> mPasspointManager.getProviderConfigs(Process.WIFI_UID /* ignored */, true),
@@ -3701,10 +3710,22 @@ public class WifiServiceImpl extends BaseWifiService {
         for (PasspointConfiguration config : configs) {
             removePasspointConfigurationInternal(null, config.getUniqueId());
         }
+
+        mQtiPasspointManager = mWifiInjector.makeOrGetQtiPasspointManager();
+        configs = mWifiThreadRunner.call(
+                () -> mQtiPasspointManager.getProviderConfigs(
+                Process.WIFI_UID, true), Collections.emptyList());
+        for (PasspointConfiguration config : configs) {
+            removePasspointConfigurationInternal(null, config.getUniqueId(), STA_SECONDARY);
+        }
+
         mWifiThreadRunner.post(() -> {
             mPasspointManager.clearAnqpRequestsAndFlushCache();
+            mQtiPasspointManager.clearAnqpRequestsAndFlushCache();
             mWifiConfigManager.clearUserTemporarilyDisabledList();
             mWifiConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
+            qtiWifiConfigManager.clearUserTemporarilyDisabledList();
+            qtiWifiConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
             mClientModeImpl.clearNetworkRequestUserApprovedAccessPoints();
             mWifiNetworkSuggestionsManager.clear();
             mWifiInjector.getWifiScoreCard().clear();
