@@ -819,6 +819,11 @@ public class WifiNetworkFactory extends NetworkFactory {
         networkToConnect.shared = false;
         networkToConnect.fromWifiNetworkSpecifier = true;
 
+        // Store Requestor uid and package name
+        // This required when remove network after app calls releaseNetwork.
+        networkToConnect.creatorUid = mActiveSpecificNetworkRequest.getRequestorUid();
+        networkToConnect.creatorName = mActiveSpecificNetworkRequest.getRequestorPackageName();
+
         // Store the user selected network.
         mUserSelectedNetwork = networkToConnect;
 
