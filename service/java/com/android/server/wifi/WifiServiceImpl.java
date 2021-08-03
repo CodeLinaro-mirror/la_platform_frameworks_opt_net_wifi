@@ -35,6 +35,7 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGI
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_COVERAGE_EXTEND_FEATURE_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WHITELIST_ROAMING_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NEW_NETWORK_AUTO_CONNECTION_ENABLED;
+import static com.android.server.wifi.WifiSettingsConfigStore.HW_SUPPORTED_FEATURES;
 import android.annotation.CheckResult;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -4133,13 +4134,15 @@ public class WifiServiceImpl extends BaseWifiService {
      * @return a list of network suggestions suggested by this app
      */
     public List<WifiNetworkSuggestion> getNetworkSuggestions(String callingPackageName) {
-        mAppOps.checkPackage(Binder.getCallingUid(), callingPackageName);
+        int callingUid = Binder.getCallingUid();
+        mAppOps.checkPackage(callingUid, callingPackageName);
         enforceAccessPermission();
         if (mVerboseLoggingEnabled) {
             mLog.info("getNetworkSuggestionList uid=%").c(Binder.getCallingUid()).flush();
         }
         return mWifiThreadRunner.call(() ->
-                mWifiNetworkSuggestionsManager.get(callingPackageName), Collections.emptyList());
+                mWifiNetworkSuggestionsManager.get(callingPackageName, callingUid),
+                Collections.emptyList());
     }
 
     /**
@@ -4529,6 +4532,12 @@ public class WifiServiceImpl extends BaseWifiService {
         mClientModeImpl.enableSoftApBeaconProtFeature(enable);
     }
 
+    @Override
+    public int isConcurrentBandSupported() {
+        enforceAccessPermission();
+        return mWifiInjector.getSettingsConfigStore().get(HW_SUPPORTED_FEATURES);
+    }
+
     /**
      * see {@link android.net.wifi.WifiManager#addOnWifiUsabilityStatsListener(Executor,
      * OnWifiUsabilityStatsListener)}
@@ -4746,7 +4755,7 @@ public class WifiServiceImpl extends BaseWifiService {
         mWifiThreadRunner.post(() ->
                 mWifiNetworkSuggestionsManager
                         .registerSuggestionConnectionStatusListener(binder, listener,
-                                listenerIdentifier, packageName));
+                                listenerIdentifier, packageName, uid));
     }
 
     /**
@@ -4756,14 +4765,15 @@ public class WifiServiceImpl extends BaseWifiService {
     public void unregisterSuggestionConnectionStatusListener(
             int listenerIdentifier, String packageName) {
         enforceAccessPermission();
+        int uid = Binder.getCallingUid();
         if (mVerboseLoggingEnabled) {
             mLog.info("unregisterSuggestionConnectionStatusListener uid=%")
-                    .c(Binder.getCallingUid()).flush();
+                    .c(uid).flush();
         }
         mWifiThreadRunner.post(() ->
                 mWifiNetworkSuggestionsManager
                         .unregisterSuggestionConnectionStatusListener(listenerIdentifier,
-                                packageName));
+                                packageName, uid));
     }
 
     @Override
