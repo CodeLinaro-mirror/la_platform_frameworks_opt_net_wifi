@@ -17,6 +17,7 @@
 package com.android.wifitrackerlib;
 
 import static android.net.wifi.WifiInfo.DEFAULT_MAC_ADDRESS;
+import static android.net.wifi.WifiInfo.sanitizeSsid;
 
 import static com.android.wifitrackerlib.Utils.getVerboseLoggingDescription;
 
@@ -77,15 +78,15 @@ public class MergedCarrierEntry extends WifiEntry {
     }
 
     @Override
-    public String getSsid() {
+    public synchronized String getSsid() {
         if (mWifiInfo != null) {
-            return mWifiInfo.getSSID();
+            return sanitizeSsid(mWifiInfo.getSSID());
         }
         return null;
     }
 
     @Override
-    public String getMacAddress() {
+    public synchronized String getMacAddress() {
         if (mWifiInfo != null) {
             final String wifiInfoMac = mWifiInfo.getMacAddress();
             if (!TextUtils.isEmpty(wifiInfoMac)
@@ -97,20 +98,23 @@ public class MergedCarrierEntry extends WifiEntry {
     }
 
     @Override
-    public boolean canConnect() {
+    public synchronized boolean canConnect() {
         return getConnectedState() == CONNECTED_STATE_DISCONNECTED && !mIsCellDefaultRoute;
     }
 
     @Override
-    public void connect(@Nullable ConnectCallback callback) {
+    public synchronized void connect(@Nullable ConnectCallback callback) {
         mConnectCallback = callback;
         mWifiManager.startRestrictingAutoJoinToSubscriptionId(mSubscriptionId);
         Toast.makeText(mContext,
                 R.string.wifitrackerlib_wifi_wont_autoconnect_for_now, Toast.LENGTH_SHORT).show();
         if (mConnectCallback != null) {
-            mCallbackHandler.post(() ->
-                    mConnectCallback.onConnectResult(
-                            ConnectCallback.CONNECT_STATUS_SUCCESS));
+            mCallbackHandler.post(() -> {
+                final ConnectCallback connectCallback = mConnectCallback;
+                if (connectCallback != null) {
+                    connectCallback.onConnectResult(ConnectCallback.CONNECT_STATUS_SUCCESS);
+                }
+            });
         }
     }
 
@@ -120,14 +124,18 @@ public class MergedCarrierEntry extends WifiEntry {
     }
 
     @Override
-    public void disconnect(@Nullable DisconnectCallback callback) {
+    public synchronized void disconnect(@Nullable DisconnectCallback callback) {
         mDisconnectCallback = callback;
         mWifiManager.stopRestrictingAutoJoinToSubscriptionId();
         mWifiManager.startScan();
         if (mDisconnectCallback != null) {
-            mCallbackHandler.post(() ->
-                    mDisconnectCallback.onDisconnectResult(
-                            DisconnectCallback.DISCONNECT_STATUS_SUCCESS));
+            mCallbackHandler.post(() -> {
+                final DisconnectCallback disconnectCallback = mDisconnectCallback;
+                if (disconnectCallback != null) {
+                    disconnectCallback.onDisconnectResult(
+                            DisconnectCallback.DISCONNECT_STATUS_SUCCESS);
+                }
+            });
         }
     }
 
@@ -155,7 +163,7 @@ public class MergedCarrierEntry extends WifiEntry {
         return mSubscriptionId;
     }
 
-    /* package */ void updateIsCellDefaultRoute(boolean isCellDefaultRoute) {
+    /* package */ synchronized void updateIsCellDefaultRoute(boolean isCellDefaultRoute) {
         mIsCellDefaultRoute = isCellDefaultRoute;
         notifyOnUpdated();
     }
