@@ -277,7 +277,7 @@ public class SoftApStoreData implements WifiConfigStore.StoreData {
                 Log.e(TAG, "Failed to parse SSID");
                 return;
             }
-            if (ApConfigUtil.isOpenOweHotspot(securityType)) {
+            if (!ApConfigUtil.isOpenOweHotspot(securityType)) {
                 softApConfigBuilder.setPassphrase(passphrase, securityType);
             }
             if (!autoShutdownEnabledTagPresent) {
