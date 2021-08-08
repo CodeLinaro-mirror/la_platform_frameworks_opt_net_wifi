@@ -3416,6 +3416,11 @@ public class ClientModeImpl extends StateMachine {
         if (reasonCode != WifiManager.ERROR_AUTH_FAILURE_WRONG_PSWD) {
             return false;
         }
+        Log.i(TAG, "isPermanentWrongPasswordFailure - mIsWhitelistRoaming=" + mIsWhitelistRoaming);
+        if (mWifiInjector.getSettingsConfigStore().get(WIFI_WHITELIST_ROAMING_ENABLED)
+            && mIsWhitelistRoaming) {
+            return true;
+        }
         WifiConfiguration network = mWifiConfigManager.getConfiguredNetwork(networkId);
         if (network != null && network.getNetworkSelectionStatus().hasEverConnected()) {
             return false;
