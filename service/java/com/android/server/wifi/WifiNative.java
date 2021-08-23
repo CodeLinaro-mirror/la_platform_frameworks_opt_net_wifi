@@ -3119,17 +3119,32 @@ public class WifiNative {
         void onCongestionChanged(String ifname, int percentage);
     }
 
+    private int toFrameworkThermalLevel(int original_val) {
+        switch (original_val) {
+            case 0:
+                return ThermalData.THERMAL_INFO_LEVEL_FULL_PERF;
+            case 2:
+                return ThermalData.THERMAL_INFO_LEVEL_REDUCED_PERF;
+            case 4:
+                return ThermalData.THERMAL_INFO_LEVEL_TX_OFF;
+            case 5:
+                return ThermalData.THERMAL_INFO_LEVEL_SHUT_DOWN;
+        }
+        return ThermalData.THERMAL_INFO_LEVEL_UNKNOWN;
+    }
+
     private class WifiNativeHalListener implements WifiHalListener {
+        int mLastThermalLevel = ThermalData.THERMAL_INFO_LEVEL_UNKNOWN;
         @Override
         public void onThermalChanged(String ifname, int thermal_state) {
             synchronized (mThermalListeners) {
+                thermal_state = toFrameworkThermalLevel(thermal_state);
                 // Reduce duplicate Thermal change event report.
-                Iface iface = mIfaceMgr.findAnyIfaceOfType(Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY);
-                String staIfname = (iface != null) ? iface.name : null;
-                if (staIfname != null && !staIfname.equals(ifname)) {
-                    Log.d(TAG, "ignore duplicate report thermal in other ifaces - " + ifname);
+                if (thermal_state == mLastThermalLevel) {
+                    Log.d(TAG, "ignore duplicate report thermal with same level " + thermal_state);
                     return;
                 }
+                mLastThermalLevel = thermal_state;
 
                 // Put into log events
                 SimpleDateFormat formatter= new SimpleDateFormat("MM-dd HH:mm:ss.S");
@@ -3247,6 +3262,29 @@ public class WifiNative {
         return mHostapdHal.hostapdCmd(ifname, "DRIVER " + cmd);
     }
 
+    //Used for cmds requiring all internal ifaces to set when bridge
+    //iface is set
+    public String hapdDriverCmd2(String ifname, String cmd) {
+        String reply = "";
+        if (ifname.contains("br")) {
+            // bridge interface
+            ArrayList<String> ifaces = listApInterfaces();
+            if (ifaces != null && ifaces.size() > 0) {
+                for (String iface : ifaces) {
+                    reply = mHostapdHal.hostapdCmd(iface, "DRIVER " + cmd);
+                    if (!reply.contains("OK")) {
+                        return reply;
+                    }
+                }
+            } else {
+                reply = "iface not ready";
+            }
+        } else {
+            reply = mHostapdHal.hostapdCmd(ifname, "DRIVER " + cmd);
+        }
+        return reply;
+    }
+
     public String wpaDriverCmd(String ifname, String cmd) {
         return mSupplicantStaIfaceHal.doDriverCmd(ifname, cmd);
     }
@@ -3285,7 +3323,7 @@ public class WifiNative {
         final String kSetTxPowerCmd = "SET_TXPOWER " + dbm;
 
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            return setSuccess(hapdDriverCmd(ifname, kSetTxPowerCmd));
+            return setSuccess(hapdDriverCmd2(ifname, kSetTxPowerCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
                    || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
             return setSuccess(wpaDriverCmd(ifname, kSetTxPowerCmd));
@@ -3344,22 +3382,7 @@ public class WifiNative {
         }
         ThermalData thermal_data = new ThermalData();
         thermal_data.setTemperature(info[0]);
-        switch (info[1]) {
-            case 0:
-                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_FULL_PERF);
-                break;
-            case 2:
-                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_REDUCED_PERF);
-                break;
-            case 4:
-                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_TX_OFF);
-                break;
-            case 5:
-                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_SHUT_DOWN);
-                break;
-            default:
-                thermal_data.setThermalLevel(ThermalData.THERMAL_INFO_LEVEL_UNKNOWN);
-        }
+        thermal_data.setThermalLevel(toFrameworkThermalLevel(info[1]));
         return thermal_data;
     }
 
@@ -3375,7 +3398,7 @@ public class WifiNative {
         final String kSetAniCmd = "SET_ANI_LEVEL " + mode + " " + ofdmlvl;
 
         if (iface_type == Iface.IFACE_TYPE_AP) {
-            return setSuccess(hapdDriverCmd(ifname, kSetAniCmd));
+            return setSuccess(hapdDriverCmd2(ifname, kSetAniCmd));
         } else if (iface_type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
                    || iface_type == Iface.IFACE_TYPE_STA_FOR_SCAN) {
             return setSuccess(wpaDriverCmd(ifname, kSetAniCmd));

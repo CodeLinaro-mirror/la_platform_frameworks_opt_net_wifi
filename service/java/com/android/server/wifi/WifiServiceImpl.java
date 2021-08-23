@@ -2044,7 +2044,8 @@ public class WifiServiceImpl extends BaseWifiService {
         if (staId == STA_PRIMARY) {
             mClientModeImpl.disconnectCommand();
         } else {
-            QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+            QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                mActiveModeWarden.getQtiClientModeImpl(), null);
             if (qtiClientModeImpl == null) return false;
             qtiClientModeImpl.disconnectCommand();
         }
@@ -2231,7 +2232,7 @@ public class WifiServiceImpl extends BaseWifiService {
                 () -> mWifiConfigManager.getSavedNetworks(finalTargetConfigUid),
                                Collections.emptyList());
         } else if (staId == STA_SECONDARY) {
-            if (mActiveModeWarden.getQtiClientModeManager() == null) {
+            if (mWifiThreadRunner.call(() -> mActiveModeWarden.getQtiClientModeManager(), null) == null) {
                 Log.e(TAG, "getConfiguredNetworks is not allowed for STA2 before turning on it");
                 return null;
             }
@@ -2493,7 +2494,7 @@ public class WifiServiceImpl extends BaseWifiService {
                 + " nid=" + config.networkId
                 + " staId=" + Integer.toString(config.staId));
         if (config.staId == STA_SECONDARY) {
-            if (mActiveModeWarden.getQtiClientModeManager() == null) {
+            if (mWifiThreadRunner.call(() -> mActiveModeWarden.getQtiClientModeManager(), null) == null) {
                 Log.e(TAG, "addOrUpdateNetwork is not allowed for STA2 before turning on it");
                 return -1;
             }
@@ -2577,7 +2578,8 @@ public class WifiServiceImpl extends BaseWifiService {
             mClientModeImpl.connect(null, netId, new Binder(), connectListener,
                 connectListener.hashCode(), callingUid);
         } else if (staId == STA_SECONDARY) {
-            QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+            QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                mActiveModeWarden.getQtiClientModeImpl(), null);
             if(qtiClientModeImpl == null) return false;
             qtiClientModeImpl.connect(null, netId, new Binder(), connectListener,
                 connectListener.hashCode(), callingUid);
@@ -2792,7 +2794,8 @@ public class WifiServiceImpl extends BaseWifiService {
             if (staId == STA_PRIMARY) {
                 result = mClientModeImpl.syncRequestConnectionInfo();
             } else {
-                QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+                QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                    mActiveModeWarden.getQtiClientModeImpl(), null);
                 if (qtiClientModeImpl == null) return null;
                 result = qtiClientModeImpl.syncRequestConnectionInfo();
             }
@@ -3371,7 +3374,8 @@ public class WifiServiceImpl extends BaseWifiService {
                     if ((detailedState == NetworkInfo.DetailedState.CONNECTED
                             || detailedState == NetworkInfo.DetailedState.FAILED
                             || detailedState == NetworkInfo.DetailedState.DISCONNECTED)
-                            && mActiveModeWarden.getQtiClientModeManager() != null) {
+                            && (mWifiThreadRunner.call(() ->
+                                mActiveModeWarden.getQtiClientModeManager(), null) != null)) {
                         Log.d(TAG, "Start scan to reconnect STA2 if possible");
                         startScan(mContext.getOpPackageName(), mContext.getAttributionTag());
                     }
@@ -3692,9 +3696,17 @@ public class WifiServiceImpl extends BaseWifiService {
         List<WifiConfiguration> networks = mWifiThreadRunner.call(
                 () -> mWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
                 Collections.emptyList());
+
+        WifiConfigManager qtiWifiConfigManager = mWifiInjector.makeOrGetQtiWifiConfigManager();
+
+        networks.addAll(networks.size(), mWifiThreadRunner.call(
+                () ->qtiWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
+                Collections.emptyList()));
+
         for (WifiConfiguration network : networks) {
             removeNetwork(network.networkId, packageName);
         }
+
         // Delete all Passpoint configurations
         List<PasspointConfiguration> configs = mWifiThreadRunner.call(
                 () -> mPasspointManager.getProviderConfigs(Process.WIFI_UID /* ignored */, true),
@@ -3702,10 +3714,22 @@ public class WifiServiceImpl extends BaseWifiService {
         for (PasspointConfiguration config : configs) {
             removePasspointConfigurationInternal(null, config.getUniqueId());
         }
+
+        mQtiPasspointManager = mWifiInjector.makeOrGetQtiPasspointManager();
+        configs = mWifiThreadRunner.call(
+                () -> mQtiPasspointManager.getProviderConfigs(
+                Process.WIFI_UID, true), Collections.emptyList());
+        for (PasspointConfiguration config : configs) {
+            removePasspointConfigurationInternal(null, config.getUniqueId(), STA_SECONDARY);
+        }
+
         mWifiThreadRunner.post(() -> {
             mPasspointManager.clearAnqpRequestsAndFlushCache();
+            mQtiPasspointManager.clearAnqpRequestsAndFlushCache();
             mWifiConfigManager.clearUserTemporarilyDisabledList();
             mWifiConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
+            qtiWifiConfigManager.clearUserTemporarilyDisabledList();
+            qtiWifiConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
             mClientModeImpl.clearNetworkRequestUserApprovedAccessPoints();
             mWifiNetworkSuggestionsManager.clear();
             mWifiInjector.getWifiScoreCard().clear();
@@ -4388,7 +4412,8 @@ public class WifiServiceImpl extends BaseWifiService {
             }
             mClientModeImpl.connect(config, netId, binder, callback, callbackIdentifier, uid);
         } else {
-            QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+            QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                mActiveModeWarden.getQtiClientModeImpl(), null);
             if (qtiClientModeImpl != null)
                 qtiClientModeImpl.connect(config, netId, binder, callback, callbackIdentifier, uid);
         }
@@ -4413,7 +4438,8 @@ public class WifiServiceImpl extends BaseWifiService {
             mClientModeImpl.save(
                     config, binder, callback, callbackIdentifier, Binder.getCallingUid());
         } else {
-            QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+            QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                mActiveModeWarden.getQtiClientModeImpl(), null);
             if (qtiClientModeImpl != null)
                 qtiClientModeImpl.save(
                     config, binder, callback, callbackIdentifier, Binder.getCallingUid());
@@ -4440,9 +4466,10 @@ public class WifiServiceImpl extends BaseWifiService {
         if(staId == STA_PRIMARY) {
             mClientModeImpl.forget(netId, binder, callback, callbackIdentifier, uid);
         } else {
-           QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
-           if (qtiClientModeImpl != null)
-               qtiClientModeImpl.forget(netId, binder, callback, callbackIdentifier, uid);
+            QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                mActiveModeWarden.getQtiClientModeImpl(), null);
+            if (qtiClientModeImpl != null)
+                qtiClientModeImpl.forget(netId, binder, callback, callbackIdentifier, uid);
         }
     }
 
@@ -4699,7 +4726,8 @@ public class WifiServiceImpl extends BaseWifiService {
 
             if (connected && mClientModeImpl.isConnected() && isDualStaOnSameBand()) {
                 Log.d(TAG, "Disconnect sta2 due to sta1 and sta2 on same band");
-                QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+                QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+                    mActiveModeWarden.getQtiClientModeImpl(), null);
                 if (qtiClientModeImpl == null) {
                     return;
                 }
@@ -4824,7 +4852,8 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private boolean isDualStaOnSameBand() {
-        QtiClientModeImpl qtiClientModeImpl = mActiveModeWarden.getQtiClientModeImpl();
+        QtiClientModeImpl qtiClientModeImpl = mWifiThreadRunner.call(() ->
+            mActiveModeWarden.getQtiClientModeImpl(), null);
         if (qtiClientModeImpl != null)
             return mWifiThreadRunner.call(() -> qtiClientModeImpl.isDualStaOnSameBand(), false);
 
