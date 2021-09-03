@@ -31,6 +31,7 @@ import static android.net.wifi.WifiManager.WIFI_STATE_UNKNOWN;
 import static android.net.wifi.WifiManager.STA_PRIMARY;
 import static com.android.server.wifi.WifiDataStall.INVALID_THROUGHPUT;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WHITELIST_ROAMING_ENABLED;
+import static com.android.server.wifi.WifiSettingsConfigStore.HW_SUPPORTED_FEATURES;
 
 
 import android.annotation.IntDef;
@@ -270,6 +271,7 @@ public class ClientModeImpl extends StateMachine {
     // The subId used by WifiConfiguration with SIM credential which was connected successfully
     private int mLastSubId;
     private String mLastSimBasedConnectionCarrierName;
+    private String mConcurrentBand = null;
 
     private boolean mIpReachabilityDisconnectEnabled = true;
 
@@ -3414,6 +3416,11 @@ public class ClientModeImpl extends StateMachine {
         if (reasonCode != WifiManager.ERROR_AUTH_FAILURE_WRONG_PSWD) {
             return false;
         }
+        Log.i(TAG, "isPermanentWrongPasswordFailure - mIsWhitelistRoaming=" + mIsWhitelistRoaming);
+        if (mWifiInjector.getSettingsConfigStore().get(WIFI_WHITELIST_ROAMING_ENABLED)
+            && mIsWhitelistRoaming) {
+            return true;
+        }
         WifiConfiguration network = mWifiConfigManager.getConfiguredNetwork(networkId);
         if (network != null && network.getNetworkSelectionStatus().hasEverConnected()) {
             return false;
@@ -4013,6 +4020,12 @@ public class ClientModeImpl extends StateMachine {
             if (mClientModeCallback != null) {
                  mClientModeCallback.onStarted();
             }
+            mConcurrentBand = mWifiNative.doDriverCmd(mInterfaceName,
+                "GET_DRIVER_SUPPORTED_FEATURES");
+            Log.d(TAG, "output of doDriverCmd for concurrent band = " + mConcurrentBand);
+            if (!TextUtils.isEmpty(mConcurrentBand))
+                mWifiInjector.getSettingsConfigStore().put(HW_SUPPORTED_FEATURES,
+                    Integer.parseInt(mConcurrentBand));
         }
 
         @Override
@@ -5992,6 +6005,8 @@ public class ClientModeImpl extends StateMachine {
 
             /** clear the roaming state, if we were roaming, we failed */
             mIsAutoRoaming = false;
+            mTargetNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
+
             mIpReachabilityMonitorActive = false;
             removeMessages(CMD_IP_REACHABILITY_SESSION_END);
 
@@ -7274,13 +7289,13 @@ public class ClientModeImpl extends StateMachine {
             return;
         }
 
-        // check for FT/PSK or PSK-SHA256
+        // check for FT/PSK
         ScanDetail scanDetail = getScanDetailForBssid(mLastBssid);
         if (scanDetail != null) {
             ScanResult scanResult = scanDetail.getScanResult();
             String caps = (scanResult != null) ? scanResult.capabilities : "";
-            if (caps.contains("FT/PSK") || caps.contains("PSK-SHA256")) {
-                Log.i(TAG, "Linked network - return as current connection is FT-PSK/PSK-SHA256");
+            if (caps.contains("FT/PSK")) {
+                Log.i(TAG, "Linked network - return as current connection is FT-PSK");
                 return;
             }
         }
