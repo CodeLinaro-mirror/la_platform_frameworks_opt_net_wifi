@@ -41,6 +41,7 @@ import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
+import android.os.SystemService;
 
 import com.android.internal.annotations.Immutable;
 import com.android.internal.util.HexDump;
@@ -73,6 +74,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.BitSet;
+import java.util.NoSuchElementException;
 
 /**
  * Native calls for bring up/shut down of the supplicant daemon and for
@@ -3577,6 +3579,26 @@ public class WifiNative {
 
     //---------------------------------------------------------------------------------
     /* Packet fate API */
+
+    public static final String CNSS_DIAG_NAME = "cnss_diag";
+
+    public static void startCnssLogging() {
+        try {
+            SystemService.start(CNSS_DIAG_NAME);
+        } catch (RuntimeException e) {
+            // likely a "failed to set system property" runtime exception
+            throw new NoSuchElementException("Failed to start cnss_diag");
+        }
+    }
+
+    public static void stopCnssLogging() {
+        try {
+            SystemService.stop(CNSS_DIAG_NAME);
+        } catch (RuntimeException e) {
+            // likely a "failed to set system property" runtime exception
+            Log.w(TAG, "Failed to stop cnss_diag", e);
+        }
+    }
 
     @Immutable
     abstract static class FateReport {

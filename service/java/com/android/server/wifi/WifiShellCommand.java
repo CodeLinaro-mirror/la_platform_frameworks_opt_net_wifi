@@ -110,6 +110,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "start-softap",
             "status",
             "stop-softap",
+            "qca-set-cnss-logging",
     };
 
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
@@ -911,6 +912,15 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "sec": {
                     return execSecondaryCommand(pw);
+                }
+                case "qca-set-cnss-logging": {
+                    boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
+                    if (enabled) {
+                        WifiNative.startCnssLogging();
+                    } else {
+                        WifiNative.stopCnssLogging();
+                    }
+                    return 0;
                 }
                 default:
                     return handleDefaultCommands(cmd);
