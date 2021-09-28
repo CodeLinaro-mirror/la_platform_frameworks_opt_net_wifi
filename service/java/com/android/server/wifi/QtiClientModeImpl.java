@@ -3545,7 +3545,7 @@ public class QtiClientModeImpl extends StateMachine {
                     // we can figure this from the supplicant state. If supplicant
                     // state is DISCONNECTED, but the agent is not disconnected, we
                     // need to handle a disconnection
-                    if (state == SupplicantState.DISCONNECTED && mNetworkAgent != null) {
+                    if (state == SupplicantState.DISCONNECTED && mWifiInfo.getFrequency() != -1) {
                         if (mVerboseLoggingEnabled) {
                             log("Missed CTRL-EVENT-DISCONNECTED, disconnect");
                         }
