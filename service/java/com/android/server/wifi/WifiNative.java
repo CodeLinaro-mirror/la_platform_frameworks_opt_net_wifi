@@ -321,6 +321,17 @@ public class WifiNative {
             return ifaceNames;
         }
 
+        private String findPrimaryStaIfaceName() {
+            for (Iface iface : mIfaces.values()) {
+                if ((iface.type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
+                        || iface.type == Iface.IFACE_TYPE_STA_FOR_SCAN)
+                        && iface.name.equals("wlan0")) {
+                    return iface.name;
+                }
+            }
+            return null;
+        }
+
         private String findSecondaryStaIfaceName() {
             for (Iface iface : mIfaces.values()) {
                 if ((iface.type == Iface.IFACE_TYPE_STA_FOR_CONNECTIVITY
@@ -1416,6 +1427,18 @@ public class WifiNative {
         synchronized (mLock) {
             return mIfaceMgr.findAllStaIfaceNames();
         }
+    }
+
+    // for scanning, only use priamry STA ifaces.
+    public Set<String> getPrimaryStaInterfaceNames() {
+        Set<String> ifaceNames = new ArraySet<>();
+        synchronized (mLock) {
+            String iface = mIfaceMgr.findPrimaryStaIfaceName();
+            if (!TextUtils.isEmpty(iface)) {
+                ifaceNames.add(iface);
+            }
+        }
+        return ifaceNames;
     }
 
     public String getSecondaryStaInterfaceName() {
