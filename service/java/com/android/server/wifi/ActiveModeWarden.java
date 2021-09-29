@@ -553,14 +553,14 @@ public class ActiveModeWarden {
     private class ClientListener extends ModeCallback implements ActiveModeManager.Listener {
         @Override
         public void onStarted() {
-            updateClientScanMode();
+            updateClientScanMode(true);
             updateBatteryStats();
         }
 
         @Override
         public void onStopped() {
             mActiveModeManagers.remove(getActiveModeManager());
-            updateClientScanMode();
+            updateClientScanMode(false);
             updateBatteryStats();
             mWifiController.sendMessage(WifiController.CMD_STA_STOPPED);
         }
@@ -568,15 +568,15 @@ public class ActiveModeWarden {
         @Override
         public void onStartFailure() {
             mActiveModeManagers.remove(getActiveModeManager());
-            updateClientScanMode();
+            updateClientScanMode(false);
             updateBatteryStats();
             mWifiController.sendMessage(WifiController.CMD_STA_START_FAILURE);
         }
     }
 
     // Update the scan state based on all active mode managers.
-    private void updateClientScanMode() {
-        boolean scanEnabled = hasAnyClientModeManager();
+    private void updateClientScanMode(boolean enabled) {
+        boolean scanEnabled = enabled;
         boolean scanningForHiddenNetworksEnabled;
 
         if (mContext.getResources().getBoolean(R.bool.config_wifiScanHiddenNetworksScanOnlyMode)) {
@@ -584,6 +584,7 @@ public class ActiveModeWarden {
         } else {
             scanningForHiddenNetworksEnabled = hasAnyClientModeManagerInConnectivityRole();
         }
+        Log.w(TAG, "update scan mode " + enabled);
         mScanRequestProxy.enableScanning(scanEnabled, scanningForHiddenNetworksEnabled);
     }
 
