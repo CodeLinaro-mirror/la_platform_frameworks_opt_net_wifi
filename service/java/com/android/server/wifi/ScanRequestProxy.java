@@ -74,6 +74,8 @@ public class ScanRequestProxy {
     private static final String TAG = "WifiScanRequestProxy";
 
     @VisibleForTesting
+    public static final int SCAN_REQUEST_THROTTLE_INTERVAL_APPS_MS = 30 * 1000;
+    @VisibleForTesting
     public static final int SCAN_REQUEST_THROTTLE_TIME_WINDOW_FG_APPS_MS = 120 * 1000;
     @VisibleForTesting
     public static final int SCAN_REQUEST_THROTTLE_MAX_IN_TIME_WINDOW_FG_APPS = 4;
@@ -99,6 +101,8 @@ public class ScanRequestProxy {
     private boolean mScanningEnabled = false;
     // Flag to decide if we need to scan for hidden networks or not.
     private boolean mScanningForHiddenNetworksEnabled = false;
+    // Timestamps for the last scan requested by any app.
+    private long mLastScanTimestampForApps = 0;
     // Timestamps for the last scan requested by any background app.
     private long mLastScanTimestampForBgApps = 0;
     // Timestamps for the list of last few scan requests by each foreground app.
@@ -408,6 +412,17 @@ public class ScanRequestProxy {
         return isThrottled;
     }
 
+    private boolean shouldScanRequestBeThrottledForThroughput() {
+        long lastScanMs = mLastScanTimestampForApps;
+        long elapsedRealtime = mClock.getElapsedSinceBootMillis();
+        if (lastScanMs != 0
+                && (elapsedRealtime - lastScanMs) < SCAN_REQUEST_THROTTLE_INTERVAL_APPS_MS) {
+            return true;
+        }
+        // Proceed with the scan request and record the time.
+        mLastScanTimestampForApps = elapsedRealtime;
+        return false;
+    }
     /**
      * Initiate a wifi scan.
      *
@@ -426,8 +441,10 @@ public class ScanRequestProxy {
         // Check and throttle scan request unless,
         // a) App has either NETWORK_SETTINGS or NETWORK_SETUP_WIZARD permission.
         // b) Throttling has been disabled by user.
-        if (!fromSettingsOrSetupWizard && mThrottleEnabled
-                && shouldScanRequestBeThrottledForApp(callingUid, packageName)) {
+        if ((mWifiInjector.getClientModeImpl().isConnected()
+                && shouldScanRequestBeThrottledForThroughput())
+                || (!fromSettingsOrSetupWizard && mThrottleEnabled
+                && shouldScanRequestBeThrottledForApp(callingUid, packageName))) {
             Log.i(TAG, "Scan request from " + packageName + " throttled");
             sendScanResultFailureBroadcastToPackage(packageName);
             return false;
@@ -473,6 +490,7 @@ public class ScanRequestProxy {
      */
     private void clearScanResults() {
         mLastScanResults.clear();
+        mLastScanTimestampForApps = 0;
         mLastScanTimestampForBgApps = 0;
         mLastScanTimestampsForFgApps.clear();
     }
