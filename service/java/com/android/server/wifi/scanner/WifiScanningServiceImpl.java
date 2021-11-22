@@ -456,7 +456,8 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
     }
 
     private void setupScannerImpls() {
-        Set<String> ifaceNames = mWifiNative.getClientInterfaceNames();
+        Set<String> ifaceNames = mWifiNative.getPrimaryStaInterfaceNames();
+        loge("setupScannerImpls " + ifaceNames);
         if (ArrayUtils.isEmpty(ifaceNames)) {
             loge("Failed to retrieve client interface names");
             return;
@@ -742,6 +743,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                     WifiScannerImpl impl = entry.getValue();
                     boolean success = impl.startSingleScan(
                             scanSettings, new ScanEventHandler(ifaceName));
+                    Log.e(TAG, "startSingleScan ifaceNmae " + ifaceName);
                     if (!success) {
                         Log.e(TAG, "Failed to start single scan on " + ifaceName);
                         continue;
