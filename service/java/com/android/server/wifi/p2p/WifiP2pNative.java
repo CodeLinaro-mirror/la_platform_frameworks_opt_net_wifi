@@ -617,7 +617,7 @@ public class WifiP2pNative {
 
         WifiNl80211Manager wifiCondManager = mWifiInjector.getWifiCondManager();
         WifiNative wifiNative = mWifiInjector.getWifiNative();
-        Set<String> wifiClientInterfaces = wifiNative.getClientInterfaceNames();
+        Set<String> wifiClientInterfaces = wifiNative.getPrimaryStaInterfaceNames();
 
         for (String interfaceName: wifiClientInterfaces) {
             wifiCondManager.abortScan(interfaceName);
