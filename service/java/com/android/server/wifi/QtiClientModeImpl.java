@@ -5499,10 +5499,6 @@ public class QtiClientModeImpl extends StateMachine {
                 // next network selection.
                 mQtiWifiConnectivityManager.setUserConnectChoice(networkId);
             }
-            Message message =
-                    obtainMessage(CMD_CONNECT_NETWORK, -1, callbackIdentifier, result);
-            message.sendingUid = callingUid;
-            sendMessage(message);
         });
     }
 

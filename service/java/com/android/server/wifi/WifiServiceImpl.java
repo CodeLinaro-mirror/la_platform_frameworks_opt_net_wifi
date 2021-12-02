@@ -2617,19 +2617,26 @@ public class WifiServiceImpl extends BaseWifiService {
             return false;
         }
         int callingUid = Binder.getCallingUid();
+        int staId = getIdentityForNetwork(netId);
         // TODO b/33807876 Log netId
-        mLog.info("enableNetwork uid=% disableOthers=%")
+        mLog.info("enableNetwork uid=% netId=% staId=% disableOthers=%")
                 .c(callingUid)
+                .c(netId)
+                .c(staId)
                 .c(disableOthers).flush();
 
         mWifiMetrics.incrementNumEnableNetworkCalls();
-        if (disableOthers) {
-            return triggerConnectAndReturnStatus(netId, callingUid);
+        if (staId == STA_PRIMARY) {
+            if (disableOthers) {
+                return triggerConnectAndReturnStatus(netId, callingUid);
+            } else {
+                return mWifiThreadRunner.call(
+                            () -> mWifiConfigManager.enableNetwork(netId, false, callingUid, packageName), false);
+            }
         } else {
-            return (mWifiThreadRunner.call(
-                        () -> mWifiConfigManager.enableNetwork(netId, false, callingUid, packageName), false) ||
-                    mWifiThreadRunner.call(
-                        () -> mWifiInjector.makeOrGetQtiWifiConfigManager().enableNetwork(netId, false, callingUid, packageName), false));
+            return mWifiThreadRunner.call(
+                        () -> mWifiInjector.makeOrGetQtiWifiConfigManager().enableNetwork(netId,
+                            disableOthers, callingUid, packageName), false);
         }
     }
 
