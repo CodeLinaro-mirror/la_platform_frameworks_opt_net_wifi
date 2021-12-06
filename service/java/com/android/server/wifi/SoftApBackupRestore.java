@@ -83,6 +83,7 @@ public class SoftApBackupRestore {
             BackupUtils.writeString(out, config.getSsid());
             out.writeInt(config.getBand());
             out.writeInt(config.getChannel());
+            writeBands(out, config.getBands());
             BackupUtils.writeString(out, config.getPassphrase());
             out.writeInt(config.getSecurityType());
             out.writeBoolean(config.isHiddenSsid());
@@ -135,6 +136,11 @@ public class SoftApBackupRestore {
             } else {
                 configBuilder.setChannel(channel, band);
             }
+
+            int numberOfBands = in.readInt();
+            List<Integer> bandList = readBands(in, numberOfBands);
+            configBuilder.setBands(bandList);
+
             String passphrase = BackupUtils.readString(in);
             int securityType = in.readInt();
             if (version < 4 && securityType == WifiConfiguration.KeyMgmt.WPA2_PSK) {
@@ -206,5 +212,25 @@ public class SoftApBackupRestore {
             macList.add(MacAddress.fromBytes(mac));
         }
         return macList;
+    }
+
+    private void writeBands(DataOutputStream out, List<Integer> bandList)
+            throws IOException {
+        out.writeInt(bandList.size());
+        Iterator<Integer> iterator = bandList.iterator();
+        while (iterator.hasNext()) {
+            int band = iterator.next();
+            out.writeInt(band);
+        }
+    }
+
+    private List<Integer> readBands(DataInputStream in, int numberOfbands)
+            throws IOException {
+        List<Integer> bandList = new ArrayList<>();
+        for (int i = 0; i < numberOfbands; i++) {
+            int band = in.readInt();
+            bandList.add(band);
+        }
+        return bandList;
     }
 }
