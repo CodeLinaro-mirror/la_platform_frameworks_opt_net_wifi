@@ -484,6 +484,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
         public String gateway;
         public String subnetMask;
         public int wifiStandard = ScanResult.WIFI_STANDARD_UNKNOWN;
+        public NetworkCapabilities networkCapabilities;
 
         /**
          * Creates an empty ConnectedInfo
@@ -503,6 +504,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
             gateway = other.gateway;
             subnetMask = other.subnetMask;
             wifiStandard = other.wifiStandard;
+            networkCapabilities = other.networkCapabilities;
         }
     }
 
@@ -960,6 +962,7 @@ public class WifiEntry implements Comparable<WifiEntry> {
         if (mConnectedInfo == null) {
             return;
         }
+        mConnectedInfo.networkCapabilities = mNetworkCapabilities;
         mIsValidated = mNetworkCapabilities != null
                 && mNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
         notifyOnUpdated();
@@ -1187,6 +1190,11 @@ public class WifiEntry implements Comparable<WifiEntry> {
 
             if (currResultWifiStandard < minConnectionCapability)
                 minConnectionCapability = currResultWifiStandard;
+            /*Do not include VHT support for 2ghz when device capability is 11AC
+              and AP operating in 11AX */
+            else if (result.is24GHz() && currResultWifiStandard == ScanResult.WIFI_STANDARD_11AX &&
+                     minConnectionCapability == ScanResult.WIFI_STANDARD_11AC)
+                minConnectionCapability = ScanResult.WIFI_STANDARD_11N;
         }
 
         mWifiStandard = minConnectionCapability;
