@@ -231,6 +231,8 @@ public class WifiServiceImpl extends BaseWifiService {
 
     private final RemoteCallbackList<IWifiNativeEventCallback> mWifiNativeEventCallbacks;
 
+    private boolean mIsBootCompleted = false;
+
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
      */
@@ -477,6 +479,7 @@ public class WifiServiceImpl extends BaseWifiService {
             mPasspointManager.initializeProvisioner(
                     mWifiInjector.getPasspointProvisionerHandlerThread().getLooper());
             mClientModeImpl.handleBootCompleted();
+            mIsBootCompleted = true;
         });
     }
 
@@ -3462,6 +3465,10 @@ public class WifiServiceImpl extends BaseWifiService {
     public int handleShellCommand(@NonNull ParcelFileDescriptor in,
             @NonNull ParcelFileDescriptor out, @NonNull ParcelFileDescriptor err,
             @NonNull String[] args) {
+        if (mIsBootCompleted != true) {
+            Log.w(TAG, "Received shell command when boot is not ready!");
+            return -1;
+        }
         return new WifiShellCommand(mWifiInjector, this, mContext).exec(
                 this, in.getFileDescriptor(), out.getFileDescriptor(), err.getFileDescriptor(),
                 args);
