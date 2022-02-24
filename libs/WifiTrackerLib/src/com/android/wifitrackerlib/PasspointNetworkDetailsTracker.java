@@ -248,13 +248,13 @@ public class PasspointNetworkDetailsTracker extends NetworkDetailsTracker {
             return;
         }
 
-        long scanAgeWindow = mMaxScanAgeMillis;
+        long scanAgeWindow = getRealMaxScanAgeMillis();
         if (lastScanSucceeded) {
             cacheNewScanResults();
         } else {
             // Scan failed, increase scan age window to prevent WifiEntry list from
             // clearing prematurely.
-            scanAgeWindow += mScanIntervalMillis;
+            scanAgeWindow += getRealScanIntervalMillis();
         }
 
         List<ScanResult> currentScans = mScanResultUpdater.getScanResults(scanAgeWindow);

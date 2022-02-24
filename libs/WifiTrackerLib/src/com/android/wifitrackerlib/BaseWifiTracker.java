@@ -29,6 +29,7 @@ import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
+import android.net.NetworkInfo;
 import android.net.NetworkCapabilities;
 import android.net.NetworkKey;
 import android.net.NetworkRequest;
@@ -44,6 +45,7 @@ import android.os.Looper;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.os.SystemProperties;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.MainThread;
@@ -88,6 +90,14 @@ public class BaseWifiTracker implements LifecycleObserver {
     private final String mTag;
 
     private static boolean sVerboseLogging;
+    private static final String ALLOW_LONG_INTERVAL_CONNECTED_PROPERTY =
+            "persist.wifi.allow_long_interval_connected_state";
+    private static final String MAX_SCAN_AGE_CONNECTED_MILLIS_PROPERTY =
+            "persist.wifi.max_scan_age_connected_millis";
+    private static final String SCAN_INTERVAL_CONNECTED_MILLIS_PROPERTY =
+            "persist.wifi.scan_interval_connected_millis";
+    private final int DEFAULT_MAX_SCAN_AGE_CONNECTED = 40000;
+    private final int DEFAULT_WIFI_SCAN_INTERVAL_CONNECTED = 30000;
 
     public static boolean isVerboseLoggingEnabled() {
         return BaseWifiTracker.sVerboseLogging;
@@ -128,6 +138,7 @@ public class BaseWifiTracker implements LifecycleObserver {
             } else if (WifiManager.CONFIGURED_NETWORKS_CHANGED_ACTION.equals(action)) {
                 handleConfiguredNetworksChangedAction(intent);
             } else if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)) {
+                updateConnectionStateIfNeeded(intent);
                 handleNetworkStateChangedAction(intent);
             } else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)) {
                 handleRssiChangedAction();
@@ -149,11 +160,16 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected final Handler mWorkerHandler;
     protected final long mMaxScanAgeMillis;
     protected final long mScanIntervalMillis;
+    private final long mMaxScanAgeConnectedMillis;
+    private final long mScanIntervalConnectedMillis;
     protected final ScanResultUpdater mScanResultUpdater;
     protected final WifiNetworkScoreCache mWifiNetworkScoreCache;
     protected boolean mIsWifiValidated;
     protected boolean mIsWifiDefaultRoute;
     protected boolean mIsCellDefaultRoute;
+    private boolean mIsConnected;
+    private final boolean mAllowConnetedLongScanInterval;
+
     private final Set<NetworkKey> mRequestedScoreKeys = new HashSet<>();
 
     // Network request for listening on changes to Wifi link properties and network capabilities
@@ -311,11 +327,22 @@ public class BaseWifiTracker implements LifecycleObserver {
         mWorkerHandler = workerHandler;
         mMaxScanAgeMillis = maxScanAgeMillis;
         mScanIntervalMillis = scanIntervalMillis;
+        mMaxScanAgeConnectedMillis = SystemProperties.getInt(
+                MAX_SCAN_AGE_CONNECTED_MILLIS_PROPERTY,
+                DEFAULT_MAX_SCAN_AGE_CONNECTED);
+        mScanIntervalConnectedMillis = SystemProperties.getInt(
+                SCAN_INTERVAL_CONNECTED_MILLIS_PROPERTY,
+                DEFAULT_WIFI_SCAN_INTERVAL_CONNECTED);
+        mAllowConnetedLongScanInterval = SystemProperties.getBoolean(
+                ALLOW_LONG_INTERVAL_CONNECTED_PROPERTY, false);
+
         mListener = listener;
         mTag = tag;
 
         mScanResultUpdater = new ScanResultUpdater(clock,
-                maxScanAgeMillis + scanIntervalMillis);
+                maxScanAgeMillis + scanIntervalMillis,
+                mAllowConnetedLongScanInterval,
+                mScanIntervalConnectedMillis + mMaxScanAgeConnectedMillis);
         mWifiNetworkScoreCache = new WifiNetworkScoreCache(mContext,
                 new WifiNetworkScoreCache.CacheListener(mWorkerHandler) {
                     @Override
@@ -359,6 +386,13 @@ public class BaseWifiTracker implements LifecycleObserver {
             Log.v(mTag, "Wifi is the default route: " + mIsWifiDefaultRoute);
             Log.v(mTag, "Cell is the default route: " + mIsCellDefaultRoute);
         }
+        mIsConnected = mWifiManager.getCurrentNetwork() == null ? false : true;
+        Log.v(mTag, "AllowConnectedLongInterval = " + mAllowConnetedLongScanInterval
+                + " ,MaxScanAgeConnected = " + mMaxScanAgeConnectedMillis
+                + " ,ScanIntervalConnected =" + mScanIntervalConnectedMillis
+                + " ,IsConnected = " + mIsConnected);
+        if (mIsConnected)
+            mScanResultUpdater.SetConnectedState(true);
 
         mNetworkScoreManager.registerNetworkScoreCache(
                 NetworkKey.TYPE_WIFI,
@@ -402,6 +436,24 @@ public class BaseWifiTracker implements LifecycleObserver {
         return mWifiManager.getWifiState();
     }
 
+    @AnyThread
+    protected long getRealMaxScanAgeMillis() {
+        if (mAllowConnetedLongScanInterval && mIsConnected) {
+            return mMaxScanAgeConnectedMillis;
+        } else  {
+            return mMaxScanAgeMillis;
+        }
+    }
+
+    @AnyThread
+    protected long getRealScanIntervalMillis() {
+        if (mAllowConnetedLongScanInterval && mIsConnected) {
+            return mScanIntervalConnectedMillis;
+        } else  {
+            return mScanIntervalMillis;
+        }
+    }
+
     /**
      * Method to run on the worker thread when onStart is invoked.
      * Data that can be updated immediately after onStart should be populated here.
@@ -442,6 +494,23 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected void handleNetworkStateChangedAction(@NonNull Intent intent) {
         // Do nothing.
     }
+
+    @WorkerThread
+    private void updateConnectionStateIfNeeded(@NonNull Intent intent) {
+        if (!mAllowConnetedLongScanInterval) return;
+        NetworkInfo networkInfo = (NetworkInfo) intent.getParcelableExtra(
+                WifiManager.EXTRA_NETWORK_INFO);
+        if (networkInfo.getDetailedState() == NetworkInfo.DetailedState.CONNECTED) {
+            if (!mIsConnected) {
+                mIsConnected = true;
+                mScanResultUpdater.SetConnectedState(true);
+            }
+        } else if (mIsConnected) {
+            mIsConnected = false;
+            mScanResultUpdater.SetConnectedState(false);
+        }
+    }
+
 
     /**
      * Handle receiving the WifiManager.RSSI_CHANGED_ACTION broadcast
@@ -536,7 +605,7 @@ public class BaseWifiTracker implements LifecycleObserver {
                 mRetry = 0;
                 return;
             }
-            postDelayed(this::postScan, mScanIntervalMillis);
+            postDelayed(this::postScan, getRealScanIntervalMillis());
         }
     }
 
