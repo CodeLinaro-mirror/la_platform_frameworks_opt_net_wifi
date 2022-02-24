@@ -683,14 +683,14 @@ public class WifiPickerTracker extends BaseWifiTracker {
             return;
         }
 
-        long scanAgeWindow = mMaxScanAgeMillis;
+        long scanAgeWindow = getRealMaxScanAgeMillis();
         if (lastScanSucceeded) {
             // Scan succeeded, cache new scans
             mScanResultUpdater.update(mWifiManager.getScanResults());
         } else {
             // Scan failed, increase scan age window to prevent WifiEntry list from
             // clearing prematurely.
-            scanAgeWindow += mScanIntervalMillis;
+            scanAgeWindow += getRealScanIntervalMillis();
         }
 
         List<ScanResult> scanResults = mScanResultUpdater.getScanResults(scanAgeWindow);

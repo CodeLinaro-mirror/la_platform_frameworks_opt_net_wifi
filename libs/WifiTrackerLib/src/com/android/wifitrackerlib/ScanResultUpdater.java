@@ -37,6 +37,9 @@ public class ScanResultUpdater {
     private final long mMaxScanAgeMillis;
     private final Object mLock = new Object();
     private final Clock mClock;
+    private final boolean mAllowConnetedLongScanInterval;
+    private final long mMaxScanAgeConnectedMillis;
+    private boolean mIsConnected;
 
     /**
      * Creates a ScanResultUpdater with no max scan age.
@@ -47,6 +50,18 @@ public class ScanResultUpdater {
         this(clock, Long.MAX_VALUE);
     }
 
+    public void SetConnectedState(boolean isConnected) {
+        mIsConnected = isConnected;
+    }
+
+    private long getRealMaxScanAgeMillis() {
+        if (mAllowConnetedLongScanInterval && mIsConnected) {
+            return mMaxScanAgeConnectedMillis;
+        } else  {
+            return mMaxScanAgeMillis;
+        }
+    }
+
     /**
      * Creates a ScanResultUpdater with a max scan age in milliseconds. Scans older than this limit
      * will be pruned upon update/retrieval to keep the size of the scan list down.
@@ -54,6 +69,16 @@ public class ScanResultUpdater {
     public ScanResultUpdater(Clock clock, long maxScanAgeMillis) {
         mMaxScanAgeMillis = maxScanAgeMillis;
         mClock = clock;
+        mAllowConnetedLongScanInterval = false;
+        mMaxScanAgeConnectedMillis = 0;
+    }
+
+    public ScanResultUpdater(Clock clock, long maxScanAgeMillis,
+            boolean allowConnetedLongScanInterval, long maxScanAgeConnectedMillis) {
+        mMaxScanAgeMillis = maxScanAgeMillis;
+        mClock = clock;
+        mAllowConnetedLongScanInterval = allowConnetedLongScanInterval;
+        mMaxScanAgeConnectedMillis = maxScanAgeConnectedMillis;
     }
 
     /**
@@ -78,7 +103,7 @@ public class ScanResultUpdater {
      */
     @NonNull
     public List<ScanResult> getScanResults() {
-        return getScanResults(mMaxScanAgeMillis);
+        return getScanResults(getRealMaxScanAgeMillis());
     }
 
     /**
@@ -87,7 +112,7 @@ public class ScanResultUpdater {
      */
     @NonNull
     public List<ScanResult> getScanResults(long maxScanAgeMillis) throws IllegalArgumentException {
-        if (maxScanAgeMillis > mMaxScanAgeMillis) {
+        if (maxScanAgeMillis > getRealMaxScanAgeMillis()) {
             throw new IllegalArgumentException(
                     "maxScanAgeMillis argument cannot be greater than mMaxScanAgeMillis!");
         }
@@ -105,7 +130,7 @@ public class ScanResultUpdater {
     private void evictOldScans() {
         synchronized (mLock) {
             mScanResultsBySsidAndBssid.entrySet().removeIf((entry) ->
-                    mClock.millis() - entry.getValue().timestamp / 1000 > mMaxScanAgeMillis);
+                    mClock.millis() - entry.getValue().timestamp / 1000 > getRealMaxScanAgeMillis());
         }
     }
 }
