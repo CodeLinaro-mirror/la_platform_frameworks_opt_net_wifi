@@ -4,6 +4,9 @@ package {
 
 android_library {
     name: "WifiTrackerLib",
+    defaults: [
+        "framework-wifi-vendor-hide-access-defaults",
+    ],
     srcs: ["src/**/*.java"],
     static_libs: [
         "androidx.preference_preference",
