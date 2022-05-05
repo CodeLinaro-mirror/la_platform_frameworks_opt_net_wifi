@@ -274,14 +274,14 @@ public class SavedNetworkTracker extends BaseWifiTracker {
             return;
         }
 
-        long scanAgeWindow = getRealMaxScanAgeMillis();
+        long scanAgeWindow = mMaxScanAgeMillis;
         if (lastScanSucceeded) {
             // Scan succeeded, cache new scans
             mScanResultUpdater.update(mWifiManager.getScanResults());
         } else {
             // Scan failed, increase scan age window to prevent WifiEntry list from
             // clearing prematurely.
-            scanAgeWindow += getRealScanIntervalMillis();
+            scanAgeWindow += mScanIntervalMillis;
         }
         updateStandardWifiEntryScans(mScanResultUpdater.getScanResults(scanAgeWindow));
         updatePasspointWifiEntryScans(mScanResultUpdater.getScanResults(scanAgeWindow));
