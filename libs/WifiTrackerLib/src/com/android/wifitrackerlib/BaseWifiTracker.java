@@ -472,12 +472,8 @@ public class BaseWifiTracker implements LifecycleObserver {
     @MainThread
     public void onStop() {
         if (mEnableScanSingleBand == true) {
-            if (mScanIntervalBand2GHzMillis != 0 ) {
-                mWorkerHandler.post(mScanner::stop);
-            }
-            if (mScanIntervalBand5GHzMillis != 0 ) {
-                mWorkerHandler.post(mScanner2::stop);
-            }
+            mWorkerHandler.post(mScanner::stop);
+            mWorkerHandler.post(mScanner2::stop);
         } else {
             mWorkerHandler.post(mScanner::stop);
         }
@@ -560,21 +556,14 @@ public class BaseWifiTracker implements LifecycleObserver {
     @WorkerThread
     private void scannerStart() {
         if (mEnableScanSingleBand) {
-            if (mScanIntervalBand2GHzMillis != 0 ) {
-               // Start 2G band Scan with scan interval mScanIntervalBand2GHzMillis,
-               // Scan interval 0 means diabling scan on this band.
-                mScanner.start();
-            } else if (isVerboseLoggingEnabled()) {
-                Log.v(mTag, "Scan is not started on 2G band");
-            }
-            if (mScanIntervalBand5GHzMillis != 0 ) {
-               // Start 5G band Scan with scan interval mScanIntervalBand5GHzMillis,
-               // Scan interval 0 means diabling scan on this band.
-                mScanner2.start();
-            } else if (isVerboseLoggingEnabled()) {
-                Log.v(mTag, "Scan is not started on 5G band");
-            }
+            // Start 2G band Scan with scan interval mScanIntervalBand2GHzMillis,
+            // Scan interval 0 means diabling scan on this band.
+            mScanner.start();
+            // Start 5G band Scan with scan interval mScanIntervalBand5GHzMillis,
+            // Scan interval 0 means diabling scan on this band.
+            mScanner2.start();
         } else {
+            // Start full band scan as default way.
             mScanner.start();
         }
     }
@@ -582,12 +571,8 @@ public class BaseWifiTracker implements LifecycleObserver {
     @WorkerThread
     private void scannerStop() {
         if (mEnableScanSingleBand) {
-            if (mScanIntervalBand2GHzMillis != 0 ) {
-                mScanner.stop();
-            }
-            if (mScanIntervalBand5GHzMillis != 0 ) {
-                mScanner2.stop();
-            }
+            mScanner.stop();
+            mScanner2.stop();
         } else {
             mScanner.stop();
         }
@@ -686,6 +671,10 @@ public class BaseWifiTracker implements LifecycleObserver {
         }
 
         private void postScan() {
+            if (shouldSkipScan()) {
+                postDelayed(this::postScan, getRealScanIntervalMillis());
+                return;
+            }
             if (isVerboseLoggingEnabled()) {
                 Log.v(mTag, "scan bands:" + mScanBands + " ,mBandsInUse:" + mBandsInUse
                         + " ,scan interval:" + getRealScanIntervalMillis());
@@ -703,15 +692,26 @@ public class BaseWifiTracker implements LifecycleObserver {
             postDelayed(this::postScan, getRealScanIntervalMillis());
         }
 
-        // If the scanning band has a critical connection, then schedule next
-        // scan with configured interval. If scanning band has no critical connection,
-        // then schedule next scan with default interval(10s).
+        // If the scanning band has a critical connection, then schedule next scan with
+        // configured interval. If scanning band has no critical connection, then schedule
+        // next scan with default interval(10s).
         private long getRealScanIntervalMillis() {
-            if (mEnableScanSingleBand && (mScanBands & mBandsInUse) != 0) {
+            if (mEnableScanSingleBand && (mScanBands & mBandsInUse) != 0
+                    && mScanIntervalMs != 0) {
                 return mScanIntervalMs;
             } else  {
                 return mDefaultScanIntervalMillis;
             }
+        }
+
+        // When configured interval is 0, skip scan if critical connection exists otherwise
+        // perform scan with default interval(10s).
+        private boolean shouldSkipScan() {
+            if (mEnableScanSingleBand && (mScanBands & mBandsInUse) != 0
+                    && mScanIntervalMs == 0) {
+                return true;
+            }
+            return false;
         }
     }
 
