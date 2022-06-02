@@ -58,7 +58,7 @@
     <string name="wifitrackerlib_wifi_security_short_sae" msgid="107913757758514692">"WPA3"</string>
     <string name="wifitrackerlib_wifi_security_sae" msgid="6191706087425911867">"WPA3-Personal"</string>
     <string name="wifitrackerlib_wifi_security_short_owe" msgid="224333285610280433">"OWE"</string>
-    <string name="wifitrackerlib_wifi_security_owe" msgid="1018282395106838649">"Täiustatud avamine"</string>
+    <string name="wifitrackerlib_wifi_security_owe" msgid="1018282395106838649">"Enhanced Open"</string>
     <string name="wifitrackerlib_wifi_security_none" msgid="2686062484642847280">"Pole"</string>
     <string name="wifitrackerlib_wifi_security_passpoint" msgid="3980446437188585906">"Passpoint"</string>
     <string name="wifitrackerlib_wifi_passpoint_expired" msgid="7974960573887452566">"Aegunud"</string>
@@ -71,4 +71,11 @@
     <string name="wifitrackerlib_osu_sign_up_complete" msgid="3279606633343124580">"Registreerimine on lõpule viidud. Ühendamine …"</string>
     <string name="wifitrackerlib_imsi_protection_warning" msgid="7202210931586169466">"See võrk saab SIM-i ID, mida saab kasutada seadme asukoha jälgimiseks. "<annotation id="url">"Lisateave"</annotation></string>
     <string name="wifitrackerlib_wifi_wont_autoconnect_for_now" msgid="4923161724964349851">"WiFi-ühendust ei looda praegu automaatselt"</string>
+    <string name="wifitrackerlib_wifi_standard_unknown" msgid="8339211498889012019">"Tundmatu"</string>
+    <string name="wifitrackerlib_wifi_standard_legacy" msgid="7760511318791054384">"Pärandtehnoloogia"</string>
+    <string name="wifitrackerlib_wifi_standard_11n" msgid="2642177213395884818">"4. põlvkonna WiFi"</string>
+    <string name="wifitrackerlib_wifi_standard_11ac" msgid="4347870672254411383">"5. põlvkonna WiFi"</string>
+    <string name="wifitrackerlib_wifi_standard_11ax" msgid="4071875115186480116">"6. põlvkonna WiFi"</string>
+    <string name="wifitrackerlib_wifi_standard_11ad" msgid="4955749187120493383">"WiGig"</string>
+    <string name="wifitrackerlib_wifi_standard_11be" msgid="1886834788680487835">"7. põlvkonna WiFi"</string>
 </resources>
