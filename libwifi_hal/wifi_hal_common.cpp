@@ -44,7 +44,9 @@ extern "C" int delete_module(const char *, unsigned int);
 #endif
 
 static const char DRIVER_PROP_NAME[] = "wlan.driver.status";
+static const char DUAL_WLAN_PROP_NAME[] = "ro.vendor.wlan.dual_wlan_enabled";
 static bool is_driver_loaded = false;
+static bool is_dual_wlan_on_board = false;
 #ifdef WIFI_DRIVER_MODULE_PATH
 static const char DRIVER_MODULE_NAME[] = WIFI_DRIVER_MODULE_NAME;
 static const char DRIVER_MODULE_TAG[] = WIFI_DRIVER_MODULE_NAME " ";
@@ -94,6 +96,43 @@ static int rmmod(const char *modname) {
   return ret;
 }
 
+#ifdef WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY
+int wifi_change_secondary_driver_state(const char *state) {
+  int len;
+  int fd;
+  int ret = 0;
+  struct timespec req;
+  req.tv_sec = 0;
+  req.tv_nsec = kDriverStateAccessRetrySleepMillis * 1000000L;
+  int count = 5; /* wait at most 1 second for completion. */
+
+  if (!state) return -1;
+  do {
+    if (access(WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY, W_OK) == 0)
+      break;
+    nanosleep(&req, (struct timespec *)NULL);
+  } while (--count > 0);
+  if (count == 0) {
+    PLOG(ERROR) << "failed to access path: " << WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY;
+    PLOG(ERROR) << "Failed to access second driver state control param "
+                << strerror(errno) << ", " << errno;
+    return -1;
+  }
+  fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY, O_WRONLY));
+  if (fd < 0) {
+    PLOG(ERROR) << "Failed to open second driver state control param";
+    return -1;
+  }
+  len = strlen(state) + 1;
+  if (TEMP_FAILURE_RETRY(write(fd, state, len)) != len) {
+    PLOG(ERROR) << "Failed to write second driver state control param";
+    ret = -1;
+  }
+  close(fd);
+  return ret;
+}
+#endif
+
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
 int wifi_change_driver_state(const char *state) {
   int len;
@@ -132,6 +171,7 @@ int wifi_change_driver_state(const char *state) {
 
 int is_wifi_driver_loaded() {
   char driver_status[PROPERTY_VALUE_MAX];
+  char dual_wlan_status[PROPERTY_VALUE_MAX];
 #ifdef WIFI_DRIVER_MODULE_PATH
   FILE *proc;
   char line[sizeof(DRIVER_MODULE_TAG) + 10];
@@ -140,6 +180,9 @@ int is_wifi_driver_loaded() {
   if (!property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
     return 0; /* driver not loaded */
   }
+
+  if (property_get(DUAL_WLAN_PROP_NAME, dual_wlan_status, NULL))
+      is_dual_wlan_on_board = true;
 
   if (!is_driver_loaded) {
     return 0;
@@ -205,6 +248,16 @@ int wifi_load_driver() {
     return -1;
   }
 #endif
+
+  if (is_dual_wlan_on_board) {
+    /*dual wlan case*/
+#ifdef WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY
+      if (wifi_change_secondary_driver_state(WIFI_DRIVER_STATE_ON) < 0) {
+          return -1;
+        }
+#endif
+  }
+
   is_driver_loaded = true;
   return 0;
 }
@@ -233,6 +286,16 @@ int wifi_unload_driver() {
     if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0) return -1;
   }
 #endif
+
+  if (is_dual_wlan_on_board) {
+    /*dual wlan case*/
+#ifdef WIFI_DRIVER_STATE_CTRL_PARAM_SECONDARY
+    if (is_wifi_driver_loaded()) {
+        if (wifi_change_secondary_driver_state(WIFI_DRIVER_STATE_OFF) < 0) return -1;
+    }
+#endif
+  }
+
   is_driver_loaded = false;
   property_set(DRIVER_PROP_NAME, "unloaded");
   return 0;
