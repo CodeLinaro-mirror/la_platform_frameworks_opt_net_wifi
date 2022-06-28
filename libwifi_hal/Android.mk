@@ -106,7 +106,7 @@ ifneq ($(wildcard vendor/google/libraries/GoogleWifiConfigLib),)
         google_wifi_firmware_config_version_c_wrapper
 endif
   else ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
-    ifneq ($(TARGET_DEVICE),qssi)
+    ifneq ($(filter $(TARGET_DEVICE), qssi qssi_64),$(TARGET_DEVICE))
       LIB_WIFI_HAL := libwifi-hal-qcom
       VENDOR_LOCAL_SHARED_LIBRARIES := libcld80211
       VENDOR_LOCAL_SHARED_LIBRARIES += libcrypto

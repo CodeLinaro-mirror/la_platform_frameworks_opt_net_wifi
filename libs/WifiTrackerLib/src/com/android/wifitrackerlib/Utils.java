@@ -595,6 +595,10 @@ public class Utils {
         return name.toString();
     }
 
+    static boolean isServerCertUsedNetwork(@NonNull WifiConfiguration config) {
+        return config.enterpriseConfig != null && config.enterpriseConfig
+                .isEapMethodServerCertUsed();
+    }
     static boolean isSimCredential(@NonNull WifiConfiguration config) {
         return config.enterpriseConfig != null
                 && config.enterpriseConfig.isAuthenticationSimBased();
@@ -651,7 +655,8 @@ public class Utils {
 
     static CharSequence getImsiProtectionDescription(Context context,
             @Nullable WifiConfiguration wifiConfig) {
-        if (context == null || wifiConfig == null || !isSimCredential(wifiConfig)) {
+        if (context == null || wifiConfig == null || !isSimCredential(wifiConfig)
+                || isServerCertUsedNetwork(wifiConfig)) {
             return "";
         }
         int subId;
@@ -667,7 +672,7 @@ public class Utils {
         }
 
         // IMSI protection is not provided, return warning message.
-        return HiddenApiWrapper.linkifyAnnotation(context, context.getText(
+        return NonSdkApiWrapper.linkifyAnnotation(context, context.getText(
                 R.string.wifitrackerlib_imsi_protection_warning), "url",
                 context.getString(R.string.wifitrackerlib_help_url_imsi_protection));
     }
