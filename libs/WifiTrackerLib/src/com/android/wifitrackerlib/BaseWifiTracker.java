@@ -355,12 +355,12 @@ public class BaseWifiTracker implements LifecycleObserver {
             // 2, If 2G band has critical connections, mScanIntervalBand2GHzMillis is used.
             // 3, If 5G band has critical connections, mScanIntervalBand5GHzMillis is used.
             // 4, mScanIntervalMillis/mMaxScanAgeMillis are only used for scan age update.
-            mScanIntervalBand2GHzMillis = SystemProperties.getInt(
-                    SCAN_INTERVAL_2G_MILLIS_PROPERTY,
+            long t = SystemProperties.getLong(SCAN_INTERVAL_2G_MILLIS_PROPERTY,
                     DEFAULT_SCAN_INTERVAL_2G_MILLIS);
-            mScanIntervalBand5GHzMillis = SystemProperties.getInt(
-                    SCAN_INTERVAL_5G_MILLIS_PROPERTY,
+            mScanIntervalBand2GHzMillis = t >= 0 ? t : DEFAULT_SCAN_INTERVAL_2G_MILLIS;
+            t = SystemProperties.getLong(SCAN_INTERVAL_5G_MILLIS_PROPERTY,
                     DEFAULT_SCAN_INTERVAL_5G_MILLIS);
+            mScanIntervalBand5GHzMillis = t >= 0 ? t : DEFAULT_SCAN_INTERVAL_5G_MILLIS;
             // mScanIntervalMillis equals to max{Default, Band2G, Band5G} scan interval,
             // it's used to calculate max scan age.
             mScanIntervalMillis =
