@@ -151,6 +151,10 @@ public class BaseWifiTracker implements LifecycleObserver {
                 }
             } else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)) {
                 handleRssiChangedAction();
+                // CR/3194889: a corner case that Car/Settings UI doesn't refresh Wi-Fi list
+                // when scanning on boths bands are disabled. To fix this issue, fake a scan
+                // result event to refresh Wi-Fi list when RSSI level changes.
+                handleFakedScanResultsAvailableActionWhenScanDisabled();
             } else if (TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED.equals(action)) {
                 handleDefaultSubscriptionChanged(intent.getIntExtra(
                         "subscription", SubscriptionManager.INVALID_SUBSCRIPTION_ID));
@@ -539,6 +543,19 @@ public class BaseWifiTracker implements LifecycleObserver {
     @WorkerThread
     protected void handleNetworkStateChangedAction(@NonNull Intent intent) {
         // Do nothing.
+    }
+
+    @WorkerThread
+    private void handleFakedScanResultsAvailableActionWhenScanDisabled() {
+        if (mEnableScanSingleBand == true &&
+                mScanIntervalBand2GHzMillis == 0 &&
+                mScanIntervalBand5GHzMillis == 0 &&
+                mBandsInUse == WifiScanner.WIFI_BAND_BOTH_WITH_DFS) {
+            // Fake a scan result event to trigger refreshing Wi-Fi list.
+            Intent intent = new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+            intent.putExtra(WifiManager.EXTRA_RESULTS_UPDATED, true);
+            handleScanResultsAvailableAction(intent);
+        }
     }
 
     @AnyThread
