@@ -167,13 +167,13 @@ public class StandardNetworkDetailsTracker extends NetworkDetailsTracker {
             return;
         }
 
-        long scanAgeWindow = getRealMaxScanAgeMillis();
+        long scanAgeWindow = mMaxScanAgeMillis;
         if (lastScanSucceeded) {
             cacheNewScanResults();
         } else {
             // Scan failed, increase scan age window to prevent WifiEntry list from
             // clearing prematurely.
-            scanAgeWindow += getRealScanIntervalMillis();
+            scanAgeWindow += mScanIntervalMillis;
         }
         mChosenEntry.updateScanResultInfo(mScanResultUpdater.getScanResults(scanAgeWindow));
     }

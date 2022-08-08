@@ -29,7 +29,6 @@ import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
-import android.net.NetworkInfo;
 import android.net.NetworkCapabilities;
 import android.net.NetworkKey;
 import android.net.NetworkRequest;
@@ -39,6 +38,7 @@ import android.net.TransportInfo;
 import android.net.vcn.VcnTransportInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiNetworkScoreCache;
 import android.os.Handler;
 import android.os.Looper;
@@ -90,14 +90,17 @@ public class BaseWifiTracker implements LifecycleObserver {
     private final String mTag;
 
     private static boolean sVerboseLogging;
-    private static final String ALLOW_LONG_INTERVAL_CONNECTED_PROPERTY =
-            "persist.wifi.allow_long_interval_connected_state";
-    private static final String MAX_SCAN_AGE_CONNECTED_MILLIS_PROPERTY =
-            "persist.wifi.max_scan_age_connected_millis";
-    private static final String SCAN_INTERVAL_CONNECTED_MILLIS_PROPERTY =
-            "persist.wifi.scan_interval_connected_millis";
-    private final int DEFAULT_MAX_SCAN_AGE_CONNECTED = 40000;
-    private final int DEFAULT_WIFI_SCAN_INTERVAL_CONNECTED = 30000;
+    private static final String ALLOW_SINGLE_BAND_SCAN_PROPERTY =
+            "persist.wifi.allow_single_band_scan";
+    private static final String SCAN_INTERVAL_2G_MILLIS_PROPERTY =
+            "persist.wifi.scan_interval_2g_millis";
+    private static final String SCAN_INTERVAL_5G_MILLIS_PROPERTY =
+            "persist.wifi.scan_interval_5g_millis";
+    private static final String USE_LOHS_INSTEADOF_TETHEREDAP_PROPERTY =
+            "persist.wifi.use_lohs_insteadof_tetheredap";
+    private final int DEFAULT_SCAN_INTERVAL_2G_MILLIS = 20000;
+    private final int DEFAULT_SCAN_INTERVAL_5G_MILLIS = 20000;
+    private final int SCAN_AGE_GAP_MILLIS = 5000;
 
     public static boolean isVerboseLoggingEnabled() {
         return BaseWifiTracker.sVerboseLogging;
@@ -123,9 +126,9 @@ public class BaseWifiTracker implements LifecycleObserver {
 
             if (WifiManager.WIFI_STATE_CHANGED_ACTION.equals(action)) {
                 if (mWifiManager.getWifiState() == WifiManager.WIFI_STATE_ENABLED) {
-                    mScanner.start();
+                    scannerStart();
                 } else {
-                    mScanner.stop();
+                    scannerStop();
                 }
                 notifyOnWifiStateChanged();
                 handleWifiStateChangedAction();
@@ -138,10 +141,20 @@ public class BaseWifiTracker implements LifecycleObserver {
             } else if (WifiManager.CONFIGURED_NETWORKS_CHANGED_ACTION.equals(action)) {
                 handleConfiguredNetworksChangedAction(intent);
             } else if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)) {
-                updateConnectionStateIfNeeded(intent);
+                updateBandsInUseIfNeeded(); // Primary connection changed
                 handleNetworkStateChangedAction(intent);
+            } else if (WifiManager.WIFI_AP_CLIENTS_CHANGED_ACTION.equals(action)) {
+                int apMode = intent.getIntExtra(
+                        WifiManager.EXTRA_WIFI_AP_MODE, WifiManager.IFACE_IP_MODE_UNSPECIFIED);
+                if (apMode == mAPMode) {
+                    updateBandsInUseIfNeeded(); // AP clients changed
+                }
             } else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)) {
                 handleRssiChangedAction();
+                // CR/3194889: a corner case that Car/Settings UI doesn't refresh Wi-Fi list
+                // when scanning on boths bands are disabled. To fix this issue, fake a scan
+                // result event to refresh Wi-Fi list when RSSI level changes.
+                handleFakedScanResultsAvailableActionWhenScanDisabled();
             } else if (TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED.equals(action)) {
                 handleDefaultSubscriptionChanged(intent.getIntExtra(
                         "subscription", SubscriptionManager.INVALID_SUBSCRIPTION_ID));
@@ -149,6 +162,7 @@ public class BaseWifiTracker implements LifecycleObserver {
         }
     };
     private final BaseWifiTracker.Scanner mScanner;
+    private final BaseWifiTracker.Scanner mScanner2;
     private final BaseWifiTrackerCallback mListener;
 
     protected final WifiTrackerInjector mInjector;
@@ -160,15 +174,18 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected final Handler mWorkerHandler;
     protected final long mMaxScanAgeMillis;
     protected final long mScanIntervalMillis;
-    private final long mMaxScanAgeConnectedMillis;
-    private final long mScanIntervalConnectedMillis;
     protected final ScanResultUpdater mScanResultUpdater;
     protected final WifiNetworkScoreCache mWifiNetworkScoreCache;
     protected boolean mIsWifiValidated;
     protected boolean mIsWifiDefaultRoute;
     protected boolean mIsCellDefaultRoute;
-    private boolean mIsConnected;
-    private final boolean mAllowConnetedLongScanInterval;
+    private final long mDefaultScanIntervalMillis; // Default scan interval
+    private final long mDefaultMaxScanAgeMillis;
+    private final long mScanIntervalBand2GHzMillis; // Scan interval read from property
+    private final long mScanIntervalBand5GHzMillis;
+    private final boolean mEnableScanSingleBand;
+    private final int mAPMode; // IFACE_IP_MODE_TETHERED or IFACE_IP_MODE_LOCAL_ONLY
+    private int mBandsInUse; // Indicate if specific band have a high priorty connection
 
     private final Set<NetworkKey> mRequestedScoreKeys = new HashSet<>();
 
@@ -325,24 +342,57 @@ public class BaseWifiTracker implements LifecycleObserver {
         mNetworkScoreManager = networkScoreManager;
         mMainHandler = mainHandler;
         mWorkerHandler = workerHandler;
-        mMaxScanAgeMillis = maxScanAgeMillis;
-        mScanIntervalMillis = scanIntervalMillis;
-        mMaxScanAgeConnectedMillis = SystemProperties.getInt(
-                MAX_SCAN_AGE_CONNECTED_MILLIS_PROPERTY,
-                DEFAULT_MAX_SCAN_AGE_CONNECTED);
-        mScanIntervalConnectedMillis = SystemProperties.getInt(
-                SCAN_INTERVAL_CONNECTED_MILLIS_PROPERTY,
-                DEFAULT_WIFI_SCAN_INTERVAL_CONNECTED);
-        mAllowConnetedLongScanInterval = SystemProperties.getBoolean(
-                ALLOW_LONG_INTERVAL_CONNECTED_PROPERTY, false);
+        mDefaultMaxScanAgeMillis = maxScanAgeMillis;
+        mDefaultScanIntervalMillis = scanIntervalMillis;
+        mEnableScanSingleBand = SystemProperties.getBoolean(
+                ALLOW_SINGLE_BAND_SCAN_PROPERTY, false);
+        if (mEnableScanSingleBand == true) {
+            if (true == SystemProperties.getBoolean(
+                    USE_LOHS_INSTEADOF_TETHEREDAP_PROPERTY, true)) {
+                // Use LOHS for critical connection(default).
+                mAPMode = WifiManager.IFACE_IP_MODE_LOCAL_ONLY;
+            } else {
+                // Use tethered AP for critical connection.
+                mAPMode = WifiManager.IFACE_IP_MODE_TETHERED;
+            }
+            // 1, If one band has no critical connection, mDefaultMaxScanAgeMillis is used.
+            // 2, If 2G band has critical connections, mScanIntervalBand2GHzMillis is used.
+            // 3, If 5G band has critical connections, mScanIntervalBand5GHzMillis is used.
+            // 4, mScanIntervalMillis/mMaxScanAgeMillis are only used for scan age update.
+            long t = SystemProperties.getLong(SCAN_INTERVAL_2G_MILLIS_PROPERTY,
+                    DEFAULT_SCAN_INTERVAL_2G_MILLIS);
+            mScanIntervalBand2GHzMillis = t >= 0 ? t : DEFAULT_SCAN_INTERVAL_2G_MILLIS;
+            t = SystemProperties.getLong(SCAN_INTERVAL_5G_MILLIS_PROPERTY,
+                    DEFAULT_SCAN_INTERVAL_5G_MILLIS);
+            mScanIntervalBand5GHzMillis = t >= 0 ? t : DEFAULT_SCAN_INTERVAL_5G_MILLIS;
+            // mScanIntervalMillis equals to max{Default, Band2G, Band5G} scan interval,
+            // it's used to calculate max scan age.
+            mScanIntervalMillis =
+                    mScanIntervalBand2GHzMillis > mScanIntervalBand5GHzMillis ?
+                    (mScanIntervalBand2GHzMillis > mDefaultScanIntervalMillis ?
+                    mScanIntervalBand2GHzMillis : mDefaultScanIntervalMillis) :
+                    (mScanIntervalBand5GHzMillis > mDefaultScanIntervalMillis ?
+                    mScanIntervalBand5GHzMillis : mDefaultScanIntervalMillis);
+            // Scan age shall be larger than scan interval.
+            mMaxScanAgeMillis = mScanIntervalMillis + SCAN_AGE_GAP_MILLIS;
+        } else {
+            mAPMode = WifiManager.IFACE_IP_MODE_UNSPECIFIED; // not used
+            // 1, mDefaultMaxScanAgeMillis is not used.
+            // 2, mScanIntervalBand2GHzMillis is not used.
+            // 3, mScanIntervalBand5GHzMillis is not used.
+            // 4, mScanIntervalMillis/mMaxScanAgeMillis are used for all scan and scan age update.
+            mScanIntervalBand2GHzMillis = 0;
+            mScanIntervalBand5GHzMillis = 0;
+            mScanIntervalMillis = mDefaultScanIntervalMillis;
+            mMaxScanAgeMillis = mDefaultMaxScanAgeMillis;
+        }
+        mBandsInUse = 0;
 
         mListener = listener;
         mTag = tag;
 
         mScanResultUpdater = new ScanResultUpdater(clock,
-                maxScanAgeMillis + scanIntervalMillis,
-                mAllowConnetedLongScanInterval,
-                mScanIntervalConnectedMillis + mMaxScanAgeConnectedMillis);
+                mMaxScanAgeMillis + mScanIntervalMillis);
         mWifiNetworkScoreCache = new WifiNetworkScoreCache(mContext,
                 new WifiNetworkScoreCache.CacheListener(mWorkerHandler) {
                     @Override
@@ -350,7 +400,19 @@ public class BaseWifiTracker implements LifecycleObserver {
                         handleNetworkScoreCacheUpdated();
                     }
                 });
-        mScanner = new BaseWifiTracker.Scanner(workerHandler.getLooper());
+        if (mEnableScanSingleBand == true) {
+            // Create periodic timer to perform background scan on 2.4G Band.
+            mScanner = new BaseWifiTracker.Scanner(workerHandler.getLooper(),
+                    WifiScanner.WIFI_BAND_24_GHZ, mScanIntervalBand2GHzMillis);
+            // Create periodic timer to perform background scan on 5G Band.
+            mScanner2 = new BaseWifiTracker.Scanner(workerHandler.getLooper(),
+                    WifiScanner.WIFI_BAND_5_GHZ_WITH_DFS, mScanIntervalBand5GHzMillis);
+        } else {
+            // Create periodic timer to perform background scan on all bands.
+            mScanner = new BaseWifiTracker.Scanner(workerHandler.getLooper(),
+                    WifiScanner.WIFI_BAND_ALL, mDefaultScanIntervalMillis);
+            mScanner2 = null;
+        }
         sVerboseLogging = mWifiManager.isVerboseLoggingEnabled();
     }
 
@@ -365,6 +427,7 @@ public class BaseWifiTracker implements LifecycleObserver {
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         filter.addAction(WifiManager.CONFIGURED_NETWORKS_CHANGED_ACTION);
         filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        filter.addAction(WifiManager.WIFI_AP_CLIENTS_CHANGED_ACTION);
         filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
         filter.addAction(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED);
         mContext.registerReceiver(mBroadcastReceiver, filter,
@@ -385,14 +448,14 @@ public class BaseWifiTracker implements LifecycleObserver {
         if (isVerboseLoggingEnabled()) {
             Log.v(mTag, "Wifi is the default route: " + mIsWifiDefaultRoute);
             Log.v(mTag, "Cell is the default route: " + mIsCellDefaultRoute);
+            Log.v(mTag, "mEnableScanSingleBand: " + mEnableScanSingleBand);
+            if (mEnableScanSingleBand) {
+                Log.v(mTag, "ScanInterval2G:" + mScanIntervalBand2GHzMillis
+                        + ", ScanInterval5G:" + mScanIntervalBand5GHzMillis
+                        + ", mAPmode:" + mAPMode);
+            }
         }
-        mIsConnected = mWifiManager.getCurrentNetwork() == null ? false : true;
-        Log.v(mTag, "AllowConnectedLongInterval = " + mAllowConnetedLongScanInterval
-                + " ,MaxScanAgeConnected = " + mMaxScanAgeConnectedMillis
-                + " ,ScanIntervalConnected =" + mScanIntervalConnectedMillis
-                + " ,IsConnected = " + mIsConnected);
-        if (mIsConnected)
-            mScanResultUpdater.SetConnectedState(true);
+        updateBandsInUseIfNeeded();
 
         mNetworkScoreManager.registerNetworkScoreCache(
                 NetworkKey.TYPE_WIFI,
@@ -412,7 +475,12 @@ public class BaseWifiTracker implements LifecycleObserver {
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     @MainThread
     public void onStop() {
-        mWorkerHandler.post(mScanner::stop);
+        if (mEnableScanSingleBand == true) {
+            mWorkerHandler.post(mScanner::stop);
+            mWorkerHandler.post(mScanner2::stop);
+        } else {
+            mWorkerHandler.post(mScanner::stop);
+        }
         mContext.unregisterReceiver(mBroadcastReceiver);
         mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
         mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
@@ -434,24 +502,6 @@ public class BaseWifiTracker implements LifecycleObserver {
     @AnyThread
     public int getWifiState() {
         return mWifiManager.getWifiState();
-    }
-
-    @AnyThread
-    protected long getRealMaxScanAgeMillis() {
-        if (mAllowConnetedLongScanInterval && mIsConnected) {
-            return mMaxScanAgeConnectedMillis;
-        } else  {
-            return mMaxScanAgeMillis;
-        }
-    }
-
-    @AnyThread
-    protected long getRealScanIntervalMillis() {
-        if (mAllowConnetedLongScanInterval && mIsConnected) {
-            return mScanIntervalConnectedMillis;
-        } else  {
-            return mScanIntervalMillis;
-        }
     }
 
     /**
@@ -496,21 +546,54 @@ public class BaseWifiTracker implements LifecycleObserver {
     }
 
     @WorkerThread
-    private void updateConnectionStateIfNeeded(@NonNull Intent intent) {
-        if (!mAllowConnetedLongScanInterval) return;
-        NetworkInfo networkInfo = (NetworkInfo) intent.getParcelableExtra(
-                WifiManager.EXTRA_NETWORK_INFO);
-        if (networkInfo.getDetailedState() == NetworkInfo.DetailedState.CONNECTED) {
-            if (!mIsConnected) {
-                mIsConnected = true;
-                mScanResultUpdater.SetConnectedState(true);
-            }
-        } else if (mIsConnected) {
-            mIsConnected = false;
-            mScanResultUpdater.SetConnectedState(false);
+    private void handleFakedScanResultsAvailableActionWhenScanDisabled() {
+        if (mEnableScanSingleBand == true &&
+                mScanIntervalBand2GHzMillis == 0 &&
+                mScanIntervalBand5GHzMillis == 0 &&
+                mBandsInUse == WifiScanner.WIFI_BAND_BOTH_WITH_DFS) {
+            // Fake a scan result event to trigger refreshing Wi-Fi list.
+            Intent intent = new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+            intent.putExtra(WifiManager.EXTRA_RESULTS_UPDATED, true);
+            handleScanResultsAvailableAction(intent);
         }
     }
 
+    @AnyThread
+    private void updateBandsInUseIfNeeded() {
+        if (!mEnableScanSingleBand) return;
+        int bands = mWifiManager.getBandsWithCriticalConnections(mAPMode);
+        if (bands < 0) {
+            Log.w(mTag, "Failed to get occupied bands");
+        } else if (bands != mBandsInUse) {
+            mBandsInUse = bands;
+            Log.v(mTag, "Update occupied bands:" + mBandsInUse);
+        }
+    }
+
+    @WorkerThread
+    private void scannerStart() {
+        if (mEnableScanSingleBand) {
+            // Start 2G band Scan with scan interval mScanIntervalBand2GHzMillis,
+            // Scan interval 0 means diabling scan on this band.
+            mScanner.start();
+            // Start 5G band Scan with scan interval mScanIntervalBand5GHzMillis,
+            // Scan interval 0 means diabling scan on this band.
+            mScanner2.start();
+        } else {
+            // Start full band scan as default way.
+            mScanner.start();
+        }
+    }
+
+    @WorkerThread
+    private void scannerStop() {
+        if (mEnableScanSingleBand) {
+            mScanner.stop();
+            mScanner2.stop();
+        } else {
+            mScanner.stop();
+        }
+    }
 
     /**
      * Handle receiving the WifiManager.RSSI_CHANGED_ACTION broadcast
@@ -570,9 +653,19 @@ public class BaseWifiTracker implements LifecycleObserver {
 
         private int mRetry = 0;
         private boolean mIsActive;
+        private long mScanIntervalMs;
+        private int mScanBands;
 
         private Scanner(Looper looper) {
             super(looper);
+            mScanBands = WifiScanner.WIFI_BAND_ALL;
+            mScanIntervalMs = mDefaultScanIntervalMillis;
+        }
+
+        private Scanner(Looper looper, int bands, long scanInterval) {
+            super(looper);
+            mScanBands = bands;
+            mScanIntervalMs = scanInterval;
         }
 
         private void start() {
@@ -595,7 +688,15 @@ public class BaseWifiTracker implements LifecycleObserver {
         }
 
         private void postScan() {
-            if (mWifiManager.startScan()) {
+            if (shouldSkipScan()) {
+                postDelayed(this::postScan, getRealScanIntervalMillis());
+                return;
+            }
+            if (isVerboseLoggingEnabled()) {
+                Log.v(mTag, "scan bands:" + mScanBands + " ,mBandsInUse:" + mBandsInUse
+                        + " ,scan interval:" + getRealScanIntervalMillis());
+            }
+            if (mWifiManager.startScan(mScanBands)) {
                 mRetry = 0;
             } else if (++mRetry >= SCAN_RETRY_TIMES) {
                 // TODO(b/70983952): See if toast is needed here
@@ -606,6 +707,28 @@ public class BaseWifiTracker implements LifecycleObserver {
                 return;
             }
             postDelayed(this::postScan, getRealScanIntervalMillis());
+        }
+
+        // If the scanning band has a critical connection, then schedule next scan with
+        // configured interval. If scanning band has no critical connection, then schedule
+        // next scan with default interval(10s).
+        private long getRealScanIntervalMillis() {
+            if (mEnableScanSingleBand && (mScanBands & mBandsInUse) != 0
+                    && mScanIntervalMs != 0) {
+                return mScanIntervalMs;
+            } else  {
+                return mDefaultScanIntervalMillis;
+            }
+        }
+
+        // When configured interval is 0, skip scan if critical connection exists otherwise
+        // perform scan with default interval(10s).
+        private boolean shouldSkipScan() {
+            if (mEnableScanSingleBand && (mScanBands & mBandsInUse) != 0
+                    && mScanIntervalMs == 0) {
+                return true;
+            }
+            return false;
         }
     }
 
