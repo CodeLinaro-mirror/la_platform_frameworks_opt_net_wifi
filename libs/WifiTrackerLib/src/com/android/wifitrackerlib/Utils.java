@@ -50,6 +50,12 @@ import androidx.annotation.RequiresApi;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -205,6 +211,110 @@ public class Utils {
             }
         }
         return WifiInfo.SECURITY_TYPE_UNKNOWN;
+    }
+
+    // Copied from @HexEncoding.java#toDigit
+    private static int toDigit(char[] str, int offset) throws IllegalArgumentException {
+        // NOTE: that this isn't really a code point in the traditional sense, since we're
+        // just rejecting surrogate pairs outright.
+        int pseudoCodePoint = str[offset];
+
+        if ('0' <= pseudoCodePoint && pseudoCodePoint <= '9') {
+            return pseudoCodePoint - '0';
+        } else if ('a' <= pseudoCodePoint && pseudoCodePoint <= 'f') {
+            return 10 + (pseudoCodePoint - 'a');
+        } else if ('A' <= pseudoCodePoint && pseudoCodePoint <= 'F') {
+            return 10 + (pseudoCodePoint - 'A');
+        }
+
+        throw new IllegalArgumentException("Illegal char: " + str[offset] + " at offset " + offset);
+    }
+
+    // Copied from @HexEncoding.java#decode
+    private static byte[] decode(char[] encoded, boolean allowSingleChar)
+            throws IllegalArgumentException {
+        int encodedLength = encoded.length;
+        int resultLengthBytes = (encodedLength + 1) / 2;
+        byte[] result = new byte[resultLengthBytes];
+
+        int resultOffset = 0;
+        int i = 0;
+        if (allowSingleChar) {
+            if ((encodedLength % 2) != 0) {
+                // Odd number of digits -- the first digit is the lower 4 bits of the first result
+                // byte.
+                result[resultOffset++] = (byte) toDigit(encoded, i);
+                i++;
+            }
+        } else {
+            if ((encodedLength % 2) != 0) {
+                throw new IllegalArgumentException("Invalid input length: " + encodedLength);
+            }
+        }
+
+        for (; i < encodedLength; i += 2) {
+            result[resultOffset++] = (byte) ((toDigit(encoded, i) << 4) | toDigit(encoded, i + 1));
+        }
+
+        return result;
+    }
+
+    // Copied from @WifiSsid.java#decodeSsid
+    private static String decodeSsid(@NonNull byte[] ssidBytes, @NonNull Charset charset) {
+        CharsetDecoder decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT);
+        CharBuffer out = CharBuffer.allocate(32);
+        CoderResult result = decoder.decode(ByteBuffer.wrap(ssidBytes), out, true);
+        out.flip();
+        if (result.isError()) {
+            return null;
+        }
+        return out.toString();
+    }
+
+    // copied from @NativeUtil#removeEnclosingQuotes
+    private static String removeEnclosingQuotes(String quotedStr) {
+        int length = quotedStr.length();
+        if ((length >= 2)
+                && (quotedStr.charAt(0) == '"') && (quotedStr.charAt(length - 1) == '"')) {
+            return quotedStr.substring(1, length - 1);
+        }
+        return quotedStr;
+    }
+
+    /*
+     * SSID can be Quoted plaintext OR unquoted hexadecimal of the raw bytes.
+     * This removes enclosing Quotes for plaintext, and converts unquoted
+     * hexadecimal raw bytes to readable text.
+     */
+    static String getReadableText(String ssid) {
+        // unqouted hexadecimal raw bytes
+        if (!TextUtils.isEmpty(ssid) && ssid.charAt(0) != '"') {
+            try {
+                Charset cset = null;
+                String readableText;
+                byte[] sbytes = decode(ssid.toCharArray(), false);
+
+                cset = Charset.forName("UTF-8");
+                if (cset != null) {
+                    readableText = decodeSsid(sbytes, cset);
+                    if (!TextUtils.isEmpty(readableText)) {
+                        return readableText;
+                    }
+                }
+
+                cset = Charset.forName("GBK");
+                if (cset != null) {
+                    readableText = decodeSsid(sbytes, cset);
+                    if (!TextUtils.isEmpty(readableText)) {
+                        return readableText;
+                    }
+                }
+            } catch (IllegalArgumentException e) {/* ignore */}
+        }
+
+        return removeEnclosingQuotes(ssid);
     }
 
     /**

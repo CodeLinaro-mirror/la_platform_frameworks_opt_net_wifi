@@ -138,6 +138,10 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected boolean mIsWifiDefaultRoute;
     protected boolean mIsCellDefaultRoute;
 
+    public boolean isGbkSsidSupported() {
+        return mInjector.isGbkSsidSupported();
+    }
+
     // Network request for listening on changes to Wifi link properties and network capabilities
     // such as captive portal availability.
     private final NetworkRequest mNetworkRequest = new NetworkRequest.Builder()

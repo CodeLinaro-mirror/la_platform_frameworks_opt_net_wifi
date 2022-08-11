@@ -167,7 +167,11 @@ class OsuWifiEntry extends WifiEntry {
         final ScanResult bestScanResult = getBestScanResultByLevel(scanResults);
         if (bestScanResult != null) {
             updateTransitionModeCapa(bestScanResult);
-            mSsid = bestScanResult.SSID;
+            if (isGbkSsidSupported()) {
+                mSsid = bestScanResult.getWifiSsid().toString();
+            } else {
+                mSsid = bestScanResult.SSID;
+            }
             if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
                 mLevel = mWifiManager.calculateSignalLevel(bestScanResult.level);
             }
@@ -306,7 +310,11 @@ class OsuWifiEntry extends WifiEntry {
                     } else {
                         break;
                     }
-                    config.SSID = "\"" + bestScan.SSID + "\"";
+                    if (isGbkSsidSupported()) {
+                        config.SSID = bestScan.getWifiSsid().toString();
+                    } else {
+                        config.SSID = "\"" + bestScan.SSID + "\"";
+                    }
                     mWifiManager.connect(config, null /* ActionListener */);
                     return;
                 }
