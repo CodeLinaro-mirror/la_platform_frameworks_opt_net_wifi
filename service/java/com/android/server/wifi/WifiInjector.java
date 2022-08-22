@@ -868,6 +868,11 @@ public class WifiInjector {
         return mDeviceConfigFacade;
     }
 
+    @NonNull
+    public WifiKeyStore getWifiKeyStore() {
+        return mWifiKeyStore;
+    }
+
     /**
      * Create QtiWifiConfigManager
      */
