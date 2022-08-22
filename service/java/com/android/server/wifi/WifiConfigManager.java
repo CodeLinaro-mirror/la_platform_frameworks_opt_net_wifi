@@ -1376,7 +1376,7 @@ public class WifiConfigManager {
         // will remove the enterprise keys when provider is uninstalled. Suggestion enterprise
         // networks will remove the enterprise keys when suggestion is removed.
         if (!config.fromWifiNetworkSuggestion && !config.isPasspoint() && config.isEnterprise()) {
-            mWifiKeyStore.removeKeys(config.enterpriseConfig);
+            mWifiKeyStore.removeKeys(config.enterpriseConfig, false);
         }
 
         removeConnectChoiceFromAllNetworks(config.getKey());
