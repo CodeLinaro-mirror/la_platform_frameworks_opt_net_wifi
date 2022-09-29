@@ -62,6 +62,14 @@ class WifiTrackerInjector {
         int resId = getWifiResId(
                     "bool", "config_vendor_wifi_gbk_ssid_supported");
         mGbkSsidSupported = mWifiRes.getBoolean(resId);
+        int resId2 = getWifiResId(
+                     "array", "config_wifiCharsetsForSsidTranslation");
+        if (resId2 != 0) {
+            String[] charsets = mWifiRes.getStringArray(resId2);
+            if (charsets != null && charsets.length != 0) {
+                mGbkSsidSupported = false;
+            }
+        }
     }
 
     private int getWifiResId(String category, String name) {

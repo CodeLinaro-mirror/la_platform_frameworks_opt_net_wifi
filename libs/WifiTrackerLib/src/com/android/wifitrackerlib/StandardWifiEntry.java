@@ -418,7 +418,12 @@ public class StandardWifiEntry extends WifiEntry {
                             DisconnectCallback.DISCONNECT_STATUS_FAILURE_UNKNOWN);
                 }
             }, 10_000 /* delayMillis */);
-            mWifiManager.disableEphemeralNetwork("\"" + mKey.getScanResultKey().getSsid() + "\"");
+            if (!isGbkSsidSupported()) {
+                mWifiManager.disableEphemeralNetwork(
+                   "\"" + mKey.getScanResultKey().getSsid() + "\"");
+            } else {
+                mWifiManager.disableEphemeralNetwork(mKey.getScanResultKey().getSsid());
+            }
             mWifiManager.disconnect();
         }
     }
