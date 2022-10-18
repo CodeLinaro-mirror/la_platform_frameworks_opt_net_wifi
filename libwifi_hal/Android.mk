@@ -106,9 +106,11 @@ ifneq ($(wildcard vendor/google/libraries/GoogleWifiConfigLib),)
         google_wifi_firmware_config_version_c_wrapper
 endif
   else ifeq ($(BOARD_WLAN_DEVICE), qcwcn)
-    LIB_WIFI_HAL := libwifi-hal-qcom
-    VENDOR_LOCAL_SHARED_LIBRARIES := libcld80211
-    VENDOR_LOCAL_SHARED_LIBRARIES += libcrypto
+    ifneq ($(TARGET_BUILD_VENDOR), true)
+      LIB_WIFI_HAL := libwifi-hal-qcom
+      VENDOR_LOCAL_SHARED_LIBRARIES := libcld80211
+      VENDOR_LOCAL_SHARED_LIBRARIES += libcrypto
+    endif #End of Check for vendor target
   else ifeq ($(BOARD_WLAN_DEVICE), mrvl)
     # this is commented because none of the nexus devices
     # that sport Marvell's wifi have support for HAL
