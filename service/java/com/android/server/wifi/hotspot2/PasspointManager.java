@@ -1355,7 +1355,9 @@ public class PasspointManager {
      * Clear ANQP requests and flush ANQP Cache (for factory reset)
      */
     public void clearAnqpRequestsAndFlushCache() {
-        mAnqpRequestManager.clear();
+        if (mAnqpRequestManager != null) {
+            mAnqpRequestManager.clear();
+        }
         mAnqpCache.flush();
     }
 
