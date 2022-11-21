@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wifi.util;
@@ -345,6 +349,11 @@ public class XmlUtil {
         public static final String XML_TAG_ROAMING_CONSORTIUM_OIS = "RoamingConsortiumOIs";
         public static final String XML_TAG_SHARE_THIS_AP = "ShareThisAp";
 
+        public static final String XML_TAG_DPP_CONNECTOR = "DppConnector";
+        public static final String XML_TAG_DPP_NETACCESSKEY = "DppNetAccessKey";
+        public static final String XML_TAG_DPP_NETACCESSKEY_EXPIRY = "DppNetAccessKeyExpiry";
+        public static final String XML_TAG_DPP_CSIGN = "DppCsign";
+
         /**
          * Write WepKeys to the XML stream.
          * WepKeys array is intialized in WifiConfiguration constructor, but all of the elements
@@ -463,6 +472,11 @@ public class XmlUtil {
                     configuration.isLegacyPasspointConfig);
             XmlUtil.writeNextValue(
                     out, XML_TAG_ROAMING_CONSORTIUM_OIS, configuration.roamingConsortiumIds);
+
+            XmlUtil.writeNextValue(out, XML_TAG_DPP_CONNECTOR, configuration.dppConnector);
+            XmlUtil.writeNextValue(out, XML_TAG_DPP_NETACCESSKEY, configuration.dppNetAccessKey);
+            XmlUtil.writeNextValue(out, XML_TAG_DPP_NETACCESSKEY_EXPIRY, configuration.dppNetAccessKeyExpiry);
+            XmlUtil.writeNextValue(out, XML_TAG_DPP_CSIGN, configuration.dppCsign);
         }
 
         /**
@@ -630,6 +644,18 @@ public class XmlUtil {
                         break;
                     case XML_TAG_ROAMING_CONSORTIUM_OIS:
                         configuration.roamingConsortiumIds = (long[]) value;
+                        break;
+                    case XML_TAG_DPP_CONNECTOR:
+                        configuration.dppConnector = (String) value;
+                        break;
+                    case XML_TAG_DPP_NETACCESSKEY:
+                        configuration.dppNetAccessKey = (String) value;
+                        break;
+                    case XML_TAG_DPP_NETACCESSKEY_EXPIRY:
+                        configuration.dppNetAccessKeyExpiry = (int) value;
+                        break;
+                    case XML_TAG_DPP_CSIGN:
+                        configuration.dppCsign = (String) value;
                         break;
                     default:
                         throw new XmlPullParserException(

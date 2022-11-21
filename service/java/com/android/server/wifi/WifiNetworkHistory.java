@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wifi;
@@ -557,7 +561,7 @@ public class WifiNetworkHistory {
             return false;
         }
         if (config.allowedKeyManagement.cardinality() > 1) {
-            if (config.allowedKeyManagement.cardinality() != 2) {
+            if (config.allowedKeyManagement.cardinality() > 4) {
                 return false;
             }
             if (!config.allowedKeyManagement.get(WifiConfiguration.KeyMgmt.WPA_EAP)) {

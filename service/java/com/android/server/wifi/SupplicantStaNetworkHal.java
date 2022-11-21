@@ -12,12 +12,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 package com.android.server.wifi;
 
 import android.content.Context;
 import android.hardware.wifi.supplicant.V1_0.ISupplicantStaNetwork;
-import vendor.qti.hardware.wifi.supplicant.V1_0.ISupplicantVendorStaNetwork;
+//import vendor.qti.hardware.wifi.supplicant.V1_0.ISupplicantVendorStaNetwork;
+import vendor.qti.hardware.wifi.supplicant.V2_0.ISupplicantVendorStaNetwork;
 import android.hardware.wifi.supplicant.V1_0.ISupplicantStaNetworkCallback;
 import android.hardware.wifi.supplicant.V1_0.SupplicantStatus;
 import android.hardware.wifi.supplicant.V1_0.SupplicantStatusCode;
@@ -335,6 +340,20 @@ public class SupplicantStaNetworkHal {
                 if (keyMgmtMask.get(WifiConfiguration.KeyMgmt.FILS_SHA256) ||
                     keyMgmtMask.get(WifiConfiguration.KeyMgmt.FILS_SHA384)) {
                     config.enterpriseConfig.setFieldValue(WifiEnterpriseConfig.EAP_ERP, "1");
+		}
+
+                if (!setVendorKeyMgmt(wifiConfigurationToSupplicantVendorKeyMgmtMask(keyMgmtMask))) {
+                    Log.e(TAG, "failed to set Vendor Key Management");
+                }
+                // Check and set DPP configurations.
+                if (keyMgmtMask.get(WifiConfiguration.KeyMgmt.DPP) && !saveDppConfig(config)) {
+                    Log.e(TAG, "Failed to set DPP configurations.");
+                        return false;
+                }
+                // Check and set SuiteB configurations.
+                if (keyMgmtMask.get(WifiConfiguration.KeyMgmt.SUITE_B_192) && !saveSuiteBConfig(config)) {
+                    Log.e(TAG, "Failed to set Suite_B_192 configurations.");
+                    return false;
                 }
             }
             /** Security Protocol */
@@ -343,8 +362,14 @@ public class SupplicantStaNetworkHal {
                 Log.e(TAG, "failed to set Security Protocol");
                 return false;
             }
+            /** Vendor Security Protocol */
+            if (config.allowedProtocols.cardinality() != 0
+                    && !setVendorProto(wifiConfigurationToSupplicantVendorProtoMask(config.allowedProtocols))) {
+                Log.e(TAG, "failed to set Vendor Security Protocol");
+            }
             /** Auth Algorithm */
             if (config.allowedAuthAlgorithms.cardinality() != 0
+                    && isAuthAlgNeeded(config)
                     && !setAuthAlg(wifiConfigurationToSupplicantAuthAlgMask(
                     config.allowedAuthAlgorithms))) {
                 Log.e(TAG, "failed to set AuthAlgorithm");
@@ -352,10 +377,16 @@ public class SupplicantStaNetworkHal {
             }
             /** Group Cipher */
             if (config.allowedGroupCiphers.cardinality() != 0
-                    && !setGroupCipher(wifiConfigurationToSupplicantGroupCipherMask(
-                    config.allowedGroupCiphers))) {
+                    && (!setGroupCipher(wifiConfigurationToSupplicantGroupCipherMask(
+                    config.allowedGroupCiphers)))) {
                 Log.e(TAG, "failed to set Group Cipher");
                 return false;
+            }
+            /** Vendor Group Cipher */
+            if (config.allowedGroupCiphers.cardinality() != 0
+                    && (!setVendorGroupCipher(wifiConfigurationToSupplicantVendorGroupCipherMask(
+                    config.allowedGroupCiphers)))) {
+                Log.e(TAG, "failed to set Vendor Group Cipher");
             }
             /** Pairwise Cipher*/
             if (config.allowedPairwiseCiphers.cardinality() != 0
@@ -363,6 +394,12 @@ public class SupplicantStaNetworkHal {
                     config.allowedPairwiseCiphers))) {
                 Log.e(TAG, "failed to set PairwiseCipher");
                 return false;
+            }
+            /** Vendor Pairwise Cipher */
+            if (config.allowedPairwiseCiphers.cardinality() != 0
+                    && (!setVendorPairwiseCipher(wifiConfigurationToSupplicantVendorPairwiseCipherMask(
+                    config.allowedPairwiseCiphers)))) {
+                Log.e(TAG, "failed to set Vendor Group Cipher");
             }
             /** metadata: FQDN + ConfigKey + CreatorUid */
             final Map<String, String> metadata = new HashMap<String, String>();
@@ -399,6 +436,20 @@ public class SupplicantStaNetworkHal {
             return true;
         }
     }
+
+    /**
+     * Check if Auth Alg is needed to be sent by wificonfiguration object
+     * Supplicant internally sets auth_alg and is not needed by framework
+     * to set the same
+     */
+     private boolean isAuthAlgNeeded(WifiConfiguration config) {
+        BitSet keyMgmtMask = config.allowedKeyManagement;
+        if (keyMgmtMask.get(WifiConfiguration.KeyMgmt.SAE)) {
+            Log.d(TAG, "no need to set Auth Algo for SAE");
+            return false;
+        }
+        return true;
+     }
 
     /**
      * Read network variables from wpa_supplicant into the provided WifiEnterpriseConfig object.
@@ -489,6 +540,85 @@ public class SupplicantStaNetworkHal {
             }
             return true;
         }
+    }
+
+    /**
+     * Save network variables from the provided DPP configuration to wpa_supplicant.
+     *
+     * @param config WifiConfiguration object to be saved (only DPP configs).
+     * @return true if succeeds, false otherwise.
+     */
+    private boolean saveDppConfig(WifiConfiguration config) {
+        /** DppConnector */
+        if (config.dppConnector != null
+                && !setDppConnector(config.dppConnector)) {
+            Log.e(TAG, "failed to set DPP connector");
+            return false;
+        }
+        /** DppNetAccessKey */
+        if (config.dppNetAccessKey != null
+                && !setDppNetAccessKey(NativeUtil.stringToByteArrayList(config.dppNetAccessKey))) {
+            Log.e(TAG, "failed to set DPP Net Access key");
+            return false;
+        }
+        /** DppNetAccessKeyExipry */
+        if (config.dppNetAccessKeyExpiry >= 0
+                && !setDppNetAccessKeyExpiry(config.dppNetAccessKeyExpiry)) {
+            Log.e(TAG, "failed to set DPP Net Access Key Expiry time");
+            return false;
+        }
+        /** DppCsign */
+        if (config.dppCsign != null
+                && !setDppCsign(NativeUtil.stringToByteArrayList(config.dppCsign))) {
+            Log.e(TAG, "failed to set DPP c-sign");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Save network variables from the provided SuiteB configuration to wpa_supplicant.
+     *
+     * @param config WifiConfiguration object to be saved (only DPP configs).
+     * @return true if succeeds, false otherwise.
+     */
+    private boolean saveSuiteBConfig(WifiConfiguration config) {
+        /** Group Cipher **/
+        if (config.allowedGroupCiphers.cardinality() != 0
+            && !setGroupCipher(wifiConfigurationToSupplicantGroupCipherMask(
+                config.allowedGroupCiphers))) {
+            Log.e(TAG, "failed to set Group Cipher");
+            return false;
+        }
+        /** Pairwise Cipher*/
+        if (config.allowedPairwiseCiphers.cardinality() != 0
+            && !setPairwiseCipher(wifiConfigurationToSupplicantPairwiseCipherMask(
+                config.allowedPairwiseCiphers))) {
+            Log.e(TAG, "failed to set PairwiseCipher");
+            return false;
+        }
+        /** GroupMgmt Cipher*/
+        if (config.allowedGroupMgmtCiphers.cardinality() != 0
+            && !setGroupMgmtCipher(wifiConfigurationToSupplicantVendorGroupMgmtCipherMask(
+                config.allowedGroupMgmtCiphers))) {
+            Log.e(TAG, "failed to set GroupMgmtCipher");
+            return false;
+        }
+
+        if(config.allowedSuiteBCiphers.get(WifiConfiguration.SuiteBCipher.ECDHE_RSA)) {
+            if(!setEapPhase1Params("tls_suiteb=1")) {
+                Log.e(TAG, "failed to set TLSSuiteB");
+                return false;
+            }
+        }
+        else if (config.allowedSuiteBCiphers.get(WifiConfiguration.SuiteBCipher.ECDHE_ECDSA))
+            if(!setEapOpensslCiphers("SUITE_B_192")) {
+                Log.e(TAG, "failed to set OpensslCipher");
+                return false;
+            }
+
+        return true;
     }
 
     /**
@@ -660,9 +790,44 @@ public class SupplicantStaNetworkHal {
                     mask |= ISupplicantVendorStaNetwork.VendorKeyMgmtMask.FILS_SHA384;
                     break;
                 case WifiConfiguration.KeyMgmt.WPA2_PSK: // This should never happen
+                case WifiConfiguration.KeyMgmt.DPP:
+                case WifiConfiguration.KeyMgmt.OWE:
+                case WifiConfiguration.KeyMgmt.SAE:
+                    break;
                 default:
                     throw new IllegalArgumentException(
                             "Invalid protoMask bit in keyMgmt: " + bit);
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * Maps WifiConfiguration Key Management BitSet to Supplicant Vendor HIDL bitmask int
+     * TODO(b/32571829): Update mapping when fast transition keys are added
+     * @return bitmask int describing the allowed Key Management schemes, readable by the Supplicant
+     *         HIDL hal
+     */
+    private static int wifiConfigurationToSupplicantVendorKeyMgmtMask(BitSet keyMgmt) {
+        int mask = 0;
+        for (int bit = keyMgmt.nextSetBit(0); bit != -1; bit = keyMgmt.nextSetBit(bit + 1)) {
+            switch (bit) {
+                case WifiConfiguration.KeyMgmt.DPP:
+                    mask |= ISupplicantVendorStaNetwork.VendorKeyMgmtMask.DPP;
+                    break;
+                case WifiConfiguration.KeyMgmt.OWE:
+                    mask |= ISupplicantVendorStaNetwork.VendorKeyMgmtMask.OWE;
+                    break;
+                case WifiConfiguration.KeyMgmt.SAE:
+                    Log.e(TAG, "wifiConfigurationToSupplicantVendorKeyMgmtMask: SAE: " + WifiConfiguration.KeyMgmt.SAE);
+                    mask |= ISupplicantVendorStaNetwork.VendorKeyMgmtMask.SAE;
+                    break;
+                case WifiConfiguration.KeyMgmt.SUITE_B_192:
+                    mask |= ISupplicantVendorStaNetwork.VendorKeyMgmtMask.IEEE8021X_SUITEB_192;
+                    break;
+                case WifiConfiguration.KeyMgmt.WPA2_PSK: // This should never happen
+                default:
+                    Log.e(TAG, "Invalid VendorKeyMgmtMask bit in keyMgmt: " + bit);
             }
         }
         return mask;
@@ -684,6 +849,18 @@ public class SupplicantStaNetworkHal {
                 default:
                     throw new IllegalArgumentException(
                             "Invalid protoMask bit in wificonfig: " + bit);
+            }
+        }
+        return mask;
+    };
+
+    private static int wifiConfigurationToSupplicantVendorProtoMask(BitSet protoMask) {
+        int mask = 0;
+        for (int bit = protoMask.nextSetBit(0); bit != -1; bit = protoMask.nextSetBit(bit + 1)) {
+            switch (bit) {
+                    //TODO for vendor proto mask
+                default:
+                    Log.e(TAG, "Invalid protoMask bit in wificonfig: " + bit);
             }
         }
         return mask;
@@ -731,9 +908,46 @@ public class SupplicantStaNetworkHal {
                 case WifiConfiguration.GroupCipher.GTK_NOT_USED:
                     mask |= ISupplicantStaNetwork.GroupCipherMask.GTK_NOT_USED;
                     break;
+                case WifiConfiguration.GroupCipher.GCMP:
+                    break;
                 default:
                     throw new IllegalArgumentException(
                             "Invalid GroupCipherMask bit in wificonfig: " + bit);
+            }
+        }
+        return mask;
+    };
+
+    private static int wifiConfigurationToSupplicantVendorGroupCipherMask(BitSet groupCipherMask) {
+        int mask = 0;
+        for (int bit = groupCipherMask.nextSetBit(0); bit != -1; bit =
+                groupCipherMask.nextSetBit(bit + 1)) {
+            switch (bit) {
+                case WifiConfiguration.GroupCipher.GCMP:
+                    mask |= ISupplicantVendorStaNetwork.VendorGroupCipherMask.GCMP;
+                    mask |= ISupplicantVendorStaNetwork.VendorGroupCipherMask.GCMP_256;
+                    break;
+                default:
+                    Log.e(TAG, "Invalid VendorGroupCipherMask bit in wificonfig:: " + bit);
+            }
+        }
+        return mask;
+    };
+
+    private static int wifiConfigurationToSupplicantVendorGroupMgmtCipherMask(BitSet groupMgmtCipherMask) {
+        int mask = 0;
+        for (int bit = groupMgmtCipherMask.nextSetBit(0); bit != -1; bit =
+                groupMgmtCipherMask.nextSetBit(bit + 1)) {
+            switch (bit) {
+                case WifiConfiguration.GroupMgmtCipher.CMAC:
+                    mask |= ISupplicantVendorStaNetwork.VendorGroupMgmtCipherMask.BIP_CMAC_256;
+                    break;
+                case WifiConfiguration.GroupMgmtCipher.GMAC:
+                    mask |= ISupplicantVendorStaNetwork.VendorGroupMgmtCipherMask.BIP_GMAC_256;
+                    break;
+                default:
+                    throw new IllegalArgumentException(
+                            "Invalid GroupMgmtCipherMask bit in wificonfig: " + bit);
             }
         }
         return mask;
@@ -753,9 +967,27 @@ public class SupplicantStaNetworkHal {
                 case WifiConfiguration.PairwiseCipher.CCMP:
                     mask |= ISupplicantStaNetwork.PairwiseCipherMask.CCMP;
                     break;
+                case WifiConfiguration.PairwiseCipher.GCMP:
+                    break;
                 default:
                     throw new IllegalArgumentException(
                             "Invalid pairwiseCipherMask bit in wificonfig: " + bit);
+            }
+        }
+        return mask;
+    };
+
+    private static int wifiConfigurationToSupplicantVendorPairwiseCipherMask(BitSet pairwiseCipherMask) {
+        int mask = 0;
+        for (int bit = pairwiseCipherMask.nextSetBit(0); bit != -1; bit =
+                pairwiseCipherMask.nextSetBit(bit + 1)) {
+            switch (bit) {
+                case WifiConfiguration.PairwiseCipher.GCMP:
+                    mask |= ISupplicantVendorStaNetwork.VendorPairwiseCipherMask.GCMP;
+                    mask |= ISupplicantVendorStaNetwork.VendorPairwiseCipherMask.GCMP_256;
+                    break;
+                default:
+                    Log.e(TAG, "Invalid VendorPairwiseCipherMask bit in wificonfig:: " + bit);
             }
         }
         return mask;
@@ -899,11 +1131,29 @@ public class SupplicantStaNetworkHal {
                 mask, ISupplicantStaNetwork.GroupCipherMask.CCMP, bitset,
                 WifiConfiguration.GroupCipher.CCMP);
         mask = supplicantMaskValueToWifiConfigurationBitSet(
+                mask, ISupplicantVendorStaNetwork.VendorGroupCipherMask.GCMP_256, bitset,
+                WifiConfiguration.GroupCipher.GCMP);
+        mask = supplicantMaskValueToWifiConfigurationBitSet(
                 mask, ISupplicantStaNetwork.GroupCipherMask.GTK_NOT_USED, bitset,
                 WifiConfiguration.GroupCipher.GTK_NOT_USED);
         if (mask != 0) {
             throw new IllegalArgumentException(
                     "invalid group cipher mask from supplicant: " + mask);
+        }
+        return bitset;
+    };
+
+    private static BitSet supplicantToWifiConfigurationGroupMgmtCipherMask(int mask) {
+        BitSet bitset = new BitSet();
+        mask = supplicantMaskValueToWifiConfigurationBitSet(
+                mask, ISupplicantVendorStaNetwork.VendorGroupMgmtCipherMask.BIP_GMAC_256, bitset,
+                WifiConfiguration.GroupMgmtCipher.GMAC);
+        mask = supplicantMaskValueToWifiConfigurationBitSet(
+                mask, ISupplicantVendorStaNetwork.VendorGroupMgmtCipherMask.BIP_CMAC_256, bitset,
+                WifiConfiguration.GroupMgmtCipher.CMAC);
+        if (mask != 0) {
+            throw new IllegalArgumentException(
+                    "invalid group mgmt cipher mask from supplicant: " + mask);
         }
         return bitset;
     };
@@ -919,6 +1169,9 @@ public class SupplicantStaNetworkHal {
         mask = supplicantMaskValueToWifiConfigurationBitSet(
                 mask, ISupplicantStaNetwork.PairwiseCipherMask.CCMP, bitset,
                 WifiConfiguration.PairwiseCipher.CCMP);
+        mask = supplicantMaskValueToWifiConfigurationBitSet(
+                mask, ISupplicantVendorStaNetwork.VendorPairwiseCipherMask.GCMP_256, bitset,
+                WifiConfiguration.PairwiseCipher.GCMP);
         if (mask != 0) {
             throw new IllegalArgumentException(
                     "invalid pairwise cipher mask from supplicant: " + mask);
@@ -976,7 +1229,7 @@ public class SupplicantStaNetworkHal {
     };
 
     /** See ISupplicantNetwork.hal for documentation */
-    private boolean getId() {
+    public boolean getId() {
         synchronized (mLock) {
             final String methodStr = "getId";
             if (!checkISupplicantStaNetworkAndLogFailure(methodStr)) return false;
@@ -996,6 +1249,22 @@ public class SupplicantStaNetworkHal {
                 return false;
             }
         }
+    }
+
+    /** get network current network */
+    public int getNetworkId() {
+           return mNetworkId;
+    }
+
+    /** set local vendor sta network, if it not null */
+    public void setVendorStaNetwork(ISupplicantVendorStaNetwork vendor_network) {
+           System.out.println("stanetwork getId >>" + mNetworkId);
+           if (vendor_network != null) {
+               Log.e(TAG, "set ISupplicantVendorStaNetwork successfull");
+               mISupplicantVendorStaNetwork = vendor_network;
+           } else {
+               Log.e(TAG, "Failed to set ISupplicantVendorStaNetwork due to null");
+           }
     }
 
     /** See ISupplicantStaNetwork.hal for documentation */
@@ -1088,6 +1357,21 @@ public class SupplicantStaNetworkHal {
         }
     }
     /** See ISupplicantStaNetwork.hal for documentation */
+    private boolean setVendorKeyMgmt(int keyMgmtMask) {
+        synchronized (mLock) {
+            final String methodStr = "setVendorKeyMgmt";
+            Log.e(TAG, "Vendor Key Management " + keyMgmtMask);
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setVendorKeyMgmt(keyMgmtMask);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantStaNetwork.hal for documentation */
     private boolean setProto(int protoMask) {
         synchronized (mLock) {
             final String methodStr = "setProto";
@@ -1095,6 +1379,20 @@ public class SupplicantStaNetworkHal {
             try {
                 SupplicantStatus status =  mISupplicantStaNetwork.setProto(protoMask);
                 return checkStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setVendorProto(int protoMask) {
+        synchronized (mLock) {
+            final String methodStr = "setVendorProto";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setVendorProto(protoMask);
+                return checkVendorStatusAndLogFailure(status, methodStr);
             } catch (RemoteException e) {
                 handleRemoteException(e, methodStr);
                 return false;
@@ -1129,6 +1427,79 @@ public class SupplicantStaNetworkHal {
             }
         }
     }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setVendorGroupCipher(int groupCipherMask) {
+        synchronized (mLock) {
+            final String methodStr = "setVendorGroupCipher";
+            Log.e(TAG, "Vendor group cipher " + groupCipherMask);
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setVendorGroupCipher(groupCipherMask);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setVendorPairwiseCipher(int pairwiseCipherMask) {
+        synchronized (mLock) {
+            final String methodStr = "setVendorPairwiseCipher";
+            Log.e(TAG, "Vendor Pairwise cipher " + pairwiseCipherMask);
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setVendorPairwiseCipher(pairwiseCipherMask);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setGroupMgmtCipher(int groupMgmtCipherMask) {
+        synchronized (mLock) {
+            final String methodStr = "setGroupMgmtCipher";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setGroupMgmtCipher(groupMgmtCipherMask);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setEapPhase1Params(String phase1) {
+        synchronized (mLock) {
+            final String methodStr = "setEapPhase1Params";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setEapPhase1Params(phase1);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setEapOpensslCiphers(String cipher) {
+        synchronized (mLock) {
+            final String methodStr = "setEapOpensslCiphers";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setEapOpensslCiphers(cipher);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+
     /** See ISupplicantStaNetwork.hal for documentation */
     private boolean setPairwiseCipher(int pairwiseCipherMask) {
         synchronized (mLock) {
@@ -1452,7 +1823,63 @@ public class SupplicantStaNetworkHal {
             }
         }
     }
+    /* See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setDppConnector(String connector) {
+        synchronized (mLock) {
+            final String methodStr = "setDppConnector";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setDppConnector(connector);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
     /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setDppNetAccessKey(java.util.ArrayList<Byte> netAccessKey) {
+        synchronized (mLock) {
+            final String methodStr = "setDppNetAccessKey";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setDppNetAccessKey(netAccessKey);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setDppNetAccessKeyExpiry(int expiry) {
+        synchronized (mLock) {
+            final String methodStr = "setDppNetAccessKeyExpiry";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setDppNetAccessKeyExpiry(expiry);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+    /** See ISupplicantVendorStaNetwork.hal for documentation */
+    private boolean setDppCsign(java.util.ArrayList<Byte> csign) {
+        synchronized (mLock) {
+            final String methodStr = "setDppCsign";
+            if (!checkISupplicantVendorStaNetworkAndLogFailure(methodStr)) return false;
+            try {
+                SupplicantStatus status =  mISupplicantVendorStaNetwork.setDppCsign(csign);
+                return checkVendorStatusAndLogFailure(status, methodStr);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                return false;
+            }
+        }
+    }
+   /** See ISupplicantVendorStaNetwork.hal for documentation */
     private boolean setSimNumber(int SimNum) {
         synchronized (mLock) {
             final String methodStr = "setSimNumber";
@@ -2455,6 +2882,24 @@ public class SupplicantStaNetworkHal {
             } else {
                 if (mVerboseLoggingEnabled) {
                     Log.d(TAG, "ISupplicantStaNetwork." + methodStr + " succeeded");
+                }
+                return true;
+            }
+        }
+    }
+
+    /**
+     * Returns true if provided status code is SUCCESS, logs debug message and returns false
+     * otherwise
+     */
+    private boolean checkVendorStatusAndLogFailure(SupplicantStatus status, final String methodStr) {
+        synchronized (mLock) {
+            if (status.code != SupplicantStatusCode.SUCCESS) {
+                Log.e(TAG, "ISupplicantVendorStaNetwork." + methodStr + " failed: " + status);
+                return false;
+            } else {
+                if (mVerboseLoggingEnabled) {
+                    Log.d(TAG, "ISupplicantVendorStaNetwork." + methodStr + " succeeded");
                 }
                 return true;
             }

@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 package com.android.server.wifi.util;
 
@@ -391,6 +395,7 @@ public class InformationElementUtil {
         private static final int WPA_VENDOR_OUI_TYPE_ONE = 0x01f25000;
         private static final int WPS_VENDOR_OUI_TYPE = 0x04f25000;
         private static final short WPA_VENDOR_OUI_VERSION = 0x0001;
+        private static final int OWE_VENDOR_OUI_TYPE =  0x1c9a6f50;
         private static final short RSNE_VERSION = 0x0001;
 
         private static final int WPA_AKM_EAP = 0x01f25000;
@@ -404,6 +409,10 @@ public class InformationElementUtil {
         private static final int WPA2_AKM_PSK_SHA256 = 0x06ac0f00;
         private static final int WPA2_AKM_FILS_SHA256 = 0x0eac0f00;
         private static final int WPA2_AKM_FILS_SHA384 = 0x0fac0f00;
+        private static final int WPA2_AKM_DPP = 0x029a6f50;
+        private static final int WPA2_AKM_SAE = 0x08ac0f00;
+        private static final int WPA2_AKM_OWE = 0x12ac0f00;
+        private static final int WPA2_AKM_EAP_SUITE_B_192 = 0x0cac0f00;
 
         private static final int WPA_CIPHER_NONE = 0x00f25000;
         private static final int WPA_CIPHER_TKIP = 0x02f25000;
@@ -413,6 +422,7 @@ public class InformationElementUtil {
         private static final int RSN_CIPHER_TKIP = 0x02ac0f00;
         private static final int RSN_CIPHER_CCMP = 0x04ac0f00;
         private static final int RSN_CIPHER_NO_GROUP_ADDRESSED = 0x07ac0f00;
+        private static final int RSN_CIPHER_GCMP = 0x09ac0f00;
 
         public ArrayList<Integer> protocol;
         public ArrayList<ArrayList<Integer>> keyManagement;
@@ -494,6 +504,18 @@ public class InformationElementUtil {
                             break;
                         case WPA2_AKM_FILS_SHA384:
                             rsnKeyManagement.add(ScanResult.KEY_MGMT_FILS_SHA384);
+                        case WPA2_AKM_DPP:
+                            rsnKeyManagement.add(ScanResult.KEY_MGMT_DPP);
+                            break;
+                        case WPA2_AKM_SAE:
+                            rsnKeyManagement.add(ScanResult.KEY_MGMT_SAE);
+                            break;
+                        case WPA2_AKM_OWE:
+                            rsnKeyManagement.add(ScanResult.KEY_MGMT_OWE);
+                            break;
+                        case WPA2_AKM_EAP_SUITE_B_192:
+                            Log.i("informationelement", "captured suite b");
+                            rsnKeyManagement.add(ScanResult.KEY_MGMT_EAP_SUITE_B_192);
                             break;
                         default:
                             // do nothing
@@ -533,6 +555,8 @@ public class InformationElementUtil {
                     return ScanResult.CIPHER_TKIP;
                 case RSN_CIPHER_CCMP:
                     return ScanResult.CIPHER_CCMP;
+                case RSN_CIPHER_GCMP:
+                    return ScanResult.CIPHER_GCMP;
                 case RSN_CIPHER_NO_GROUP_ADDRESSED:
                     return ScanResult.CIPHER_NO_GROUP_ADDRESSED;
                 default:
@@ -670,9 +694,31 @@ public class InformationElementUtil {
                         // TODO(b/62134557): parse WPS IE to provide finer granularity information.
                         isWPS = true;
                     }
+                    if (isOweElement(ie)) {
+                        protocol.add(ScanResult.PROTOCOL_WPA2);
+                        groupCipher.add(ScanResult.CIPHER_CCMP);
+                        ArrayList<Integer> owePairwiseCipher = new ArrayList<>();
+                        owePairwiseCipher.add(ScanResult.CIPHER_CCMP);
+                        pairwiseCipher.add(owePairwiseCipher);
+                        ArrayList<Integer> oweKeyManagement = new ArrayList<>();
+                        oweKeyManagement.add(ScanResult.KEY_MGMT_OWE);
+                        keyManagement.add(oweKeyManagement);
+                    }
                 }
             }
         }
+
+        private static boolean isOweElement(InformationElement ie) {
+            ByteBuffer buf = ByteBuffer.wrap(ie.bytes).order(ByteOrder.LITTLE_ENDIAN);
+            try {
+            // OWE OUI and type
+                return (buf.getInt() == OWE_VENDOR_OUI_TYPE);
+            } catch (BufferUnderflowException e) {
+                Log.e("IE_Capabilities", "Couldn't parse VSA IE, buffer underflow");
+                return false;
+            }
+        }
+
 
         private String protocolToString(int protocol) {
             switch (protocol) {
@@ -707,6 +753,14 @@ public class InformationElementUtil {
                     return "FILS-SHA256";
                 case ScanResult.KEY_MGMT_FILS_SHA384:
                     return "FILS-SHA384";
+                case ScanResult.KEY_MGMT_DPP:
+                    return "DPP";
+                case ScanResult.KEY_MGMT_OWE:
+                    return "OWE";
+                case ScanResult.KEY_MGMT_SAE:
+                    return "SAE";
+                case ScanResult.KEY_MGMT_EAP_SUITE_B_192:
+                    return "EAP_SUITE_B_192";
                 default:
                     return "?";
             }
@@ -718,6 +772,8 @@ public class InformationElementUtil {
                     return "None";
                 case ScanResult.CIPHER_CCMP:
                     return "CCMP";
+                case ScanResult.CIPHER_GCMP:
+                    return "GCMP";
                 case ScanResult.CIPHER_TKIP:
                     return "TKIP";
                 default:

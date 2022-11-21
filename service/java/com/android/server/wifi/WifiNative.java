@@ -12,11 +12,16 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wifi;
 
 import android.annotation.Nullable;
+import android.annotation.NonNull;
 import android.net.apf.ApfCapabilities;
 import android.net.wifi.IApInterface;
 import android.net.wifi.IClientInterface;
@@ -28,6 +33,7 @@ import android.net.wifi.WifiLinkLayerStats;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.WifiWakeReasonAndCounts;
+import android.net.wifi.WifiDppConfig;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Pair;
@@ -559,6 +565,17 @@ public class WifiNative {
      */
     public boolean setSuspendOptimizations(boolean enabled) {
         return mSupplicantStaIfaceHal.setSuspendModeEnabled(enabled);
+    }
+
+    /**
+     * Get capabilities from driver
+     *
+     * @param ifaceName Name of the interface.
+     * @param capaType which driver capability to get, ex. key_mgmt
+     * @return String of capabilities fetched from driver.
+     */
+     public String getCapabilities(@NonNull String ifaceName, String capaType) {
+         return mSupplicantStaIfaceHal.getCapabilities(ifaceName, capaType);
     }
 
     /**
@@ -1936,5 +1953,131 @@ public class WifiNative {
         } else {
             return "*** failed to read kernel log ***";
         }
+    }
+
+    /**
+     * Add the DPP bootstrap info obtained from QR code.
+     *
+     * @param ifaceName Name of the interface.
+     * @param channel Channel for communicating with the state machine
+     * @param uri:The URI obtained from the QR code.
+     *
+     * @return: Handle to strored info else -1 on failure
+     */
+    public int dppAddBootstrapQrCode(@NonNull String ifaceName, String uri) {
+        return mSupplicantStaIfaceHal.dppAddBootstrapQrCode(ifaceName, uri);
+    }
+
+    /**
+     * Generate bootstrap URI based on the passed arguments
+     *
+     * @param ifaceName Name of the interface.
+     * @param config – bootstrap generate config
+     *
+     * @return: Handle to strored URI info else -1 on failure
+     */
+    public int dppBootstrapGenerate(@NonNull String ifaceName, WifiDppConfig config) {
+        return mSupplicantStaIfaceHal.dppBootstrapGenerate(ifaceName, config);
+    }
+
+    /**
+     * Get bootstrap URI based on bootstrap ID
+     *
+     * @param ifaceName Name of the interface.
+     * @param bootstrap_id: Stored bootstrap ID
+     *
+     * @return: URI string else -1 on failure
+     */
+    public String dppGetUri(@NonNull String ifaceName, int bootstrap_id) {
+        return mSupplicantStaIfaceHal.dppGetUri(ifaceName, bootstrap_id);
+    }
+
+    /**
+     * Remove bootstrap URI based on bootstrap ID.
+     *
+     * @param ifaceName Name of the interface.
+     * @param bootstrap_id: Stored bootstrap ID
+     *
+     * @return: 0 – Success or -1 on failure
+     */
+    public int dppBootstrapRemove(@NonNull String ifaceName, int bootstrap_id) {
+        return mSupplicantStaIfaceHal.dppBootstrapRemove(ifaceName, bootstrap_id);
+    }
+
+    /**
+     * start listen on the channel specified waiting to receive
+     * the DPP Authentication request.
+     *
+     * @param ifaceName Name of the interface.
+     * @param frequency: DPP listen frequency
+     * @param dpp_role: Configurator/Enrollee role
+     * @param qr_mutual: Mutual authentication required
+     * @param netrole_ap: network role
+     *
+     * @return: Returns 0 if a DPP-listen work is successfully
+     *  queued and -1 on failure.
+     */
+    public int dppListen(@NonNull String ifaceName, String frequency, int dpp_role,
+                         boolean qr_mutual, boolean netrole_ap) {
+        return mSupplicantStaIfaceHal.dppListen(ifaceName, frequency, dpp_role, qr_mutual, netrole_ap);
+    }
+
+    /**
+     * stop ongoing dpp listen.
+     *
+     * @param ifaceName Name of the interface.
+     */
+    public boolean dppStopListen(@NonNull String ifaceName) {
+        return mSupplicantStaIfaceHal.dppStopListen(ifaceName);
+    }
+
+    /**
+     * Adds the DPP configurator
+     *
+     * @param ifaceName Name of the interface.
+     * @param curve curve used for dpp encryption
+     * @param key private key
+     * @param expiry timeout in seconds
+     *
+     * @return: Identifier of the added configurator or -1 on failure
+     */
+    public int dppConfiguratorAdd(@NonNull String ifaceName, String curve, String key, int expiry) {
+        return mSupplicantStaIfaceHal.dppConfiguratorAdd(ifaceName, curve, key, expiry);
+    }
+
+    /**
+     * Remove the added configurator through dppConfiguratorAdd.
+     *
+     * @param ifaceName Name of the interface.
+     * @param config_id: DPP Configurator ID
+     *
+     * @return: Handle to strored info else -1 on failure
+     */
+    public int dppConfiguratorRemove(@NonNull String ifaceName, int config_id) {
+        return mSupplicantStaIfaceHal.dppConfiguratorRemove(ifaceName, config_id);
+    }
+
+    /**
+     * Start DPP authentication and provisioning with the specified peer
+     *
+     * @param ifaceName Name of the interface.
+     * @param config – dpp auth init config
+     *
+     * @return: 0 if DPP Authentication request was transmitted and -1 on failure
+     */
+    public int  dppStartAuth(@NonNull String ifaceName, WifiDppConfig config) {
+        return mSupplicantStaIfaceHal.dppStartAuth(ifaceName, config);
+    }
+
+    /**
+     * Retrieve Private key to be used for configurator
+     *
+     * @param ifaceName Name of the interface.
+     * @param id: id of configurator object
+     *
+     * @return: Key string else -1 on failure
+     */
+    public String dppConfiguratorGetKey(@NonNull String ifaceName, int id) {
+        return mSupplicantStaIfaceHal.dppConfiguratorGetKey(ifaceName, id);
     }
 }

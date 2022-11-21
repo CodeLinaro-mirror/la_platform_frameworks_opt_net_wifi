@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wifi;
@@ -20,6 +24,7 @@ import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiEnterpriseConfig;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiSsid;
+import android.net.wifi.WifiDppConfig.DppResult;
 import android.os.Handler;
 import android.os.Message;
 import android.util.ArraySet;
@@ -99,6 +104,8 @@ public class WifiMonitor {
 
    /* Fils network connection completed */
     public static final int FILS_NETWORK_CONNECTION_EVENT        = BASE + 63;
+    /* Take some gap, start DPP event from 101*/
+    public static final int DPP_EVENT                            = BASE + 101;
 
     /* WPS config errrors */
     private static final int CONFIG_MULTIPLE_PBC_DETECTED = 12;
@@ -583,5 +590,16 @@ public class WifiMonitor {
      */
     public void broadcastSupplicantDisconnectionEvent(String iface) {
         sendMessage(iface, SUP_DISCONNECTION_EVENT);
+    }
+
+    /**
+     * Broadcast the DPP events to all the handlers registered for this event.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param dppEventType Name of DPP event as defined in DppResults.
+     * @param result DppResult object.
+     */
+    public void broadcastDppEvent(String iface, int dppEventType, DppResult result) {
+        sendMessage(iface, DPP_EVENT, dppEventType, 0, result);
     }
 }
