@@ -31,6 +31,8 @@ class HostapdManager {
     kOpen,
     kWpa,
     kWpa2,  // Strongly prefer this if at all possible.
+    kOwe,
+    kSae,
   };
 
   HostapdManager() = default;

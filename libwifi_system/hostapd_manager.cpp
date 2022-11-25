@@ -195,6 +195,11 @@ string HostapdManager::CreateHostapdConfig(
       encryption_config = StringPrintf("wpa=2\n"
                                        "rsn_pairwise=CCMP\n"
                                        "wpa_psk=%s\n", psk.c_str());
+    } else if (encryption_type == EncryptionType::kOwe) {
+    } else if (encryption_type == EncryptionType::kSae) {
+      encryption_config = StringPrintf("wpa=2\n"
+                                       "rsn_pairwise=CCMP\n"
+                                       "wpa_psk=%s\n", psk.c_str());
     } else {
       using encryption_t = std::underlying_type<EncryptionType>::type;
       LOG(ERROR) << "Unknown encryption type ("

@@ -205,6 +205,9 @@ public class SoftApManager implements ActiveModeManager {
         case KeyMgmt.WPA2_PSK:
             authStr = "wpa2-psk " + wifiConfig.preSharedKey;
             break;
+        case KeyMgmt.SAE:
+            authStr = "sae " + wifiConfig.preSharedKey;
+            break;
         case KeyMgmt.NONE: /* fall-through */
         default:
             authStr = "open";
@@ -374,6 +377,12 @@ public class SoftApManager implements ActiveModeManager {
                 break;
             case KeyMgmt.WPA2_PSK:
                 encryptionType = IApInterface.ENCRYPTION_TYPE_WPA2;
+                break;
+            case KeyMgmt.OWE:
+                encryptionType = IApInterface.ENCRYPTION_TYPE_OWE;
+                break;
+            case KeyMgmt.SAE:
+                encryptionType = IApInterface.ENCRYPTION_TYPE_SAE;
                 break;
             default:
                 // We really shouldn't default to None, but this was how NetworkManagementService
