@@ -111,6 +111,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.util.EventLog;
 import android.util.Log;
 import android.util.MutableBoolean;
 
@@ -3710,7 +3711,14 @@ public class WifiServiceImpl extends BaseWifiService {
                 () ->qtiWifiConfigManager.getSavedNetworks(Process.WIFI_UID),
                 Collections.emptyList()));
 
+        EventLog.writeEvent(0x534e4554, "231985227", -1,
+                "Remove certs for factory reset");
         for (WifiConfiguration network : networks) {
+            if (network.isEnterprise()) {
+                mWifiThreadRunner.run(() ->
+                        mWifiInjector.getWifiKeyStore()
+                                .removeKeys(network.enterpriseConfig, true));
+            }
             removeNetwork(network.networkId, packageName);
         }
 
