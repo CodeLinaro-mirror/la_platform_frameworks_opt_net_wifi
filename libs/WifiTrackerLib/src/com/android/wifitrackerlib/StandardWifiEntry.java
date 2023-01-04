@@ -1047,15 +1047,25 @@ public class StandardWifiEntry extends WifiEntry {
                 int policyType = policy.getPolicyType();
                 Set<WifiSsid> ssids = policy.getSsids();
 
-                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST
-                        && !ssids.contains(
-                        WifiSsid.fromBytes(getSsid().getBytes(StandardCharsets.UTF_8)))) {
+                String ssid;
+                if (isGbkSsidSupported()) {
+                    ssid = getSsid();
+                } else {
+                    ssid = "\"" + getSsid() + "\"";
+                }
+
+                boolean isContained = false;
+                try {
+                    isContained = ssids.contains(WifiSsid.fromString(ssid));
+                } catch (IllegalArgumentException e) {
+                    Log.e(TAG, "updateAdminRestrictions e = " + e);
+                }
+
+                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST && !isContained) {
                     mIsAdminRestricted = true;
                     return;
                 }
-                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_DENYLIST
-                        && ssids.contains(
-                        WifiSsid.fromBytes(getSsid().getBytes(StandardCharsets.UTF_8)))) {
+                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_DENYLIST && isContained) {
                     mIsAdminRestricted = true;
                     return;
                 }
