@@ -292,7 +292,7 @@ public class Utils {
      * This removes enclosing Quotes for plaintext, and converts unquoted
      * hexadecimal raw bytes to readable text.
      */
-    static String getReadableText(String ssid) {
+    public static String getReadableText(String ssid) {
         // unqouted hexadecimal raw bytes
         if (!TextUtils.isEmpty(ssid) && ssid.charAt(0) != '"') {
             try {
