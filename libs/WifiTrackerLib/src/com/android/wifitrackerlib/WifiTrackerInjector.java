@@ -56,7 +56,9 @@ class WifiTrackerInjector {
                 Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
         } catch (Exception e) {
             Log.e(TAG, "exception in createPackageContext: " + e);
-            throw new RuntimeException(e);
+            // only this resource pkg support vendor gbk config
+            mGbkSsidSupported = false;
+            return;
         }
         mWifiRes = mWifiResContext.getResources();
         int resId = getWifiResId(
