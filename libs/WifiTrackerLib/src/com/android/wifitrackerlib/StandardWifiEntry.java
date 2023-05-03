@@ -215,7 +215,8 @@ public class StandardWifiEntry extends WifiEntry {
                         mTargetWifiConfig,
                         mNetworkCapabilities,
                         mIsDefaultNetwork,
-                        mIsLowQuality);
+                        mIsLowQuality,
+                        mConnectivityReport);
                 break;
             default:
                 Log.e(TAG, "getConnectedState() returned unknown state: " + connectedState);

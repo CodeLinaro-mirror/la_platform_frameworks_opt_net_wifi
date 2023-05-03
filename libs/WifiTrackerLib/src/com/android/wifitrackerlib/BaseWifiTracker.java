@@ -24,6 +24,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityDiagnosticsManager;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
@@ -129,6 +130,7 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected final Context mContext;
     protected final WifiManager mWifiManager;
     protected final ConnectivityManager mConnectivityManager;
+    protected final ConnectivityDiagnosticsManager mConnectivityDiagnosticsManager;
     protected final Handler mMainHandler;
     protected final Handler mWorkerHandler;
     protected final long mMaxScanAgeMillis;
@@ -137,6 +139,7 @@ public class BaseWifiTracker implements LifecycleObserver {
     protected boolean mIsWifiValidated;
     protected boolean mIsWifiDefaultRoute;
     protected boolean mIsCellDefaultRoute;
+    protected Network mPrimaryNetwork;
 
     public boolean isGbkSsidSupported() {
         return mInjector.isGbkSsidSupported();
@@ -160,6 +163,7 @@ public class BaseWifiTracker implements LifecycleObserver {
                             mConnectivityManager.getNetworkCapabilities(network))) {
                         return;
                     }
+                    mPrimaryNetwork = network;
                     handleLinkPropertiesChanged(lp);
                 }
 
@@ -170,6 +174,7 @@ public class BaseWifiTracker implements LifecycleObserver {
                     if (!isPrimaryWifiNetwork(networkCapabilities)) {
                         return;
                     }
+                    mPrimaryNetwork = network;
                     final boolean oldWifiValidated = mIsWifiValidated;
                     mIsWifiValidated = networkCapabilities.hasCapability(NET_CAPABILITY_VALIDATED);
                     if (isVerboseLoggingEnabled() && mIsWifiValidated != oldWifiValidated) {
@@ -186,6 +191,7 @@ public class BaseWifiTracker implements LifecycleObserver {
                         return;
                     }
                     mIsWifiValidated = false;
+                    mPrimaryNetwork = null;
                 }
             };
 
@@ -223,6 +229,16 @@ public class BaseWifiTracker implements LifecycleObserver {
                     handleDefaultRouteChanged();
                 }
             };
+
+    private final ConnectivityDiagnosticsManager.ConnectivityDiagnosticsCallback
+            mConnectivityDiagnosticsCallback =
+            new ConnectivityDiagnosticsManager.ConnectivityDiagnosticsCallback() {
+        @Override
+        public void onConnectivityReportAvailable(
+                @NonNull ConnectivityDiagnosticsManager.ConnectivityReport report) {
+            handleConnectivityReportAvailable(report);
+        }
+    };
 
     private boolean isPrimaryWifiNetwork(@Nullable NetworkCapabilities networkCapabilities) {
         if (networkCapabilities == null) {
@@ -281,6 +297,8 @@ public class BaseWifiTracker implements LifecycleObserver {
         mContext = context;
         mWifiManager = wifiManager;
         mConnectivityManager = connectivityManager;
+        mConnectivityDiagnosticsManager =
+                context.getSystemService(ConnectivityDiagnosticsManager.class);
         mMainHandler = mainHandler;
         mWorkerHandler = workerHandler;
         mMaxScanAgeMillis = maxScanAgeMillis;
@@ -314,6 +332,8 @@ public class BaseWifiTracker implements LifecycleObserver {
                     /* broadcastPermission */ null, mWorkerHandler);
             mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback,
                     mWorkerHandler);
+            mConnectivityDiagnosticsManager.registerConnectivityDiagnosticsCallback(mNetworkRequest,
+                    command -> mWorkerHandler.post(command), mConnectivityDiagnosticsCallback);
             NonSdkApiWrapper.registerSystemDefaultNetworkCallback(
                     mConnectivityManager, mDefaultNetworkCallback, mWorkerHandler);
             handleOnStart();
@@ -333,6 +353,8 @@ public class BaseWifiTracker implements LifecycleObserver {
                 mContext.unregisterReceiver(mBroadcastReceiver);
                 mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
                 mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
+                mConnectivityDiagnosticsManager.unregisterConnectivityDiagnosticsCallback(
+                        mConnectivityDiagnosticsCallback);
             } catch (IllegalArgumentException e) {
                 // Already unregistered in onDestroyed().
             }
@@ -350,6 +372,8 @@ public class BaseWifiTracker implements LifecycleObserver {
             mContext.unregisterReceiver(mBroadcastReceiver);
             mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
             mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
+            mConnectivityDiagnosticsManager.unregisterConnectivityDiagnosticsCallback(
+                    mConnectivityDiagnosticsCallback);
         } catch (IllegalArgumentException e) {
             // Already unregistered in onStop() worker thread runnable.
         }
@@ -440,6 +464,15 @@ public class BaseWifiTracker implements LifecycleObserver {
      */
     @WorkerThread
     protected void handleNetworkCapabilitiesChanged(@Nullable NetworkCapabilities capabilities) {
+        // Do nothing.
+    }
+
+    /**
+     * Handle network capability changes for the current connected Wifi network.
+     */
+    @WorkerThread
+    protected void handleConnectivityReportAvailable(
+            @NonNull ConnectivityDiagnosticsManager.ConnectivityReport connectivityReport) {
         // Do nothing.
     }
 
