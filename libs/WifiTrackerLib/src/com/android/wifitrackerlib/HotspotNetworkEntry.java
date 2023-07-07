@@ -23,9 +23,11 @@ import android.content.Context;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.sharedconnectivity.app.HotspotNetwork;
+import android.net.wifi.sharedconnectivity.app.HotspotNetworkConnectionStatus;
 import android.net.wifi.sharedconnectivity.app.NetworkProviderInfo;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivityManager;
 import android.os.Handler;
+import android.text.BidiFormatter;
 import android.util.Log;
 
 import androidx.annotation.IntDef;
@@ -56,6 +58,8 @@ public class HotspotNetworkEntry extends WifiEntry {
 
     @Nullable private HotspotNetwork mHotspotNetworkData;
     @NonNull private HotspotNetworkEntryKey mKey;
+
+    private boolean mServerInitiatedConnection = false;
 
     /**
      * If editing this IntDef also edit the definition in:
@@ -88,6 +92,27 @@ public class HotspotNetworkEntry extends WifiEntry {
             NetworkProviderInfo.DEVICE_TYPE_AUTO
     })
     public @interface DeviceType {} // TODO(b/271868642): Add IfThisThanThat lint
+
+    /**
+     * If editing this IntDef also edit the definition in:
+     * {@link android.net.wifi.sharedconnectivity.app.HotspotNetworkConnectionStatus}
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_UNKNOWN,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_UNKNOWN_ERROR,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_PROVISIONING_FAILED,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_TETHERING_TIMEOUT,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_TETHERING_UNSUPPORTED,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_NO_CELL_DATA,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT_FAILED,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT_TIMEOUT,
+            HotspotNetworkConnectionStatus.CONNECTION_STATUS_CONNECT_TO_HOTSPOT_FAILED,
+    })
+    public @interface ConnectionStatus {} // TODO(b/271868642): Add IfThisThanThat lint
 
     /**
      * Create a HotspotNetworkEntry from HotspotNetwork data.
@@ -147,7 +172,7 @@ public class HotspotNetworkEntry extends WifiEntry {
 
     @WorkerThread
     protected synchronized boolean connectionInfoMatches(@NonNull WifiInfo wifiInfo) {
-        if (wifiInfo.isPasspointAp() || wifiInfo.isOsuAp()) {
+        if (mKey.isVirtualEntry()) {
             return false;
         }
         return Objects.equals(mKey.getBssid(), wifiInfo.getBSSID());
@@ -166,9 +191,13 @@ public class HotspotNetworkEntry extends WifiEntry {
         if (mHotspotNetworkData == null) {
             return "";
         }
-        // TODO(b/271869550): Fully implement this WIP string.
-        return mHotspotNetworkData.getNetworkName() + " from "
-                + mHotspotNetworkData.getNetworkProviderInfo().getModelName();
+        if (getConnectedState() != CONNECTED_STATE_CONNECTED && mServerInitiatedConnection) {
+            return mContext.getString(R.string.wifitrackerlib_hotspot_network_connecting);
+        }
+        return mContext.getString(R.string.wifitrackerlib_hotspot_network_summary,
+                BidiFormatter.getInstance().unicodeWrap(mHotspotNetworkData.getNetworkName()),
+                BidiFormatter.getInstance().unicodeWrap(
+                        mHotspotNetworkData.getNetworkProviderInfo().getModelName()));
     }
 
     /**
@@ -180,17 +209,18 @@ public class HotspotNetworkEntry extends WifiEntry {
         if (mHotspotNetworkData == null) {
             return "";
         }
-        // TODO(b/271869550): Fully implement this WIP string.
-        return mHotspotNetworkData.getNetworkName() + " from "
-                + mHotspotNetworkData.getNetworkProviderInfo().getDeviceName();
+        return mContext.getString(R.string.wifitrackerlib_hotspot_network_alternate,
+                BidiFormatter.getInstance().unicodeWrap(mHotspotNetworkData.getNetworkName()),
+                BidiFormatter.getInstance().unicodeWrap(
+                        mHotspotNetworkData.getNetworkProviderInfo().getDeviceName()));
     }
 
     /**
      * Connection strength between the host device and the internet.
      *
-     * @return Displayed connection strength in the range 0 to 3.
+     * @return Displayed connection strength in the range 0 to 4.
      */
-    @IntRange(from = 0, to = 3)
+    @IntRange(from = 0, to = 4)
     public int getUpstreamConnectionStrength() {
         if (mHotspotNetworkData == null) {
             return 0;
@@ -235,6 +265,16 @@ public class HotspotNetworkEntry extends WifiEntry {
         return mHotspotNetworkData.getNetworkProviderInfo().getBatteryPercentage();
     }
 
+    /**
+     * If the host device is currently charging its battery.
+     */
+    public boolean isBatteryCharging() {
+        if (mHotspotNetworkData == null) {
+            return false;
+        }
+        return mHotspotNetworkData.getExtras().getBoolean("is_battery_charging", false);
+    }
+
     @Override
     public boolean canConnect() {
         return getConnectedState() == CONNECTED_STATE_DISCONNECTED;
@@ -242,23 +282,67 @@ public class HotspotNetworkEntry extends WifiEntry {
 
     @Override
     public void connect(@Nullable ConnectCallback callback) {
-        if (mSharedConnectivityManager != null) {
-            mSharedConnectivityManager.connectHotspotNetwork(mHotspotNetworkData);
+        mConnectCallback = callback;
+        if (mSharedConnectivityManager == null) {
+            if (callback != null) {
+                mCallbackHandler.post(() -> callback.onConnectResult(
+                        ConnectCallback.CONNECT_STATUS_FAILURE_UNKNOWN));
+            }
+            return;
         }
-        // TODO(b/271907257): Integrate data from connection status updates
+        mSharedConnectivityManager.connectHotspotNetwork(mHotspotNetworkData);
+    }
+
+    @Override
+    public boolean canDisconnect() {
+        return getConnectedState() != CONNECTED_STATE_DISCONNECTED;
     }
 
     @Override
     public void disconnect(@Nullable DisconnectCallback callback) {
-        if (mSharedConnectivityManager != null) {
-            mSharedConnectivityManager.disconnectHotspotNetwork(mHotspotNetworkData);
+        mDisconnectCallback = callback;
+        if (mSharedConnectivityManager == null) {
+            if (callback != null) {
+                mCallbackHandler.post(() -> callback.onDisconnectResult(
+                        DisconnectCallback.DISCONNECT_STATUS_FAILURE_UNKNOWN));
+            }
+            return;
         }
-        // TODO(b/271907257): Integrate data from connection status updates
+        mSharedConnectivityManager.disconnectHotspotNetwork(mHotspotNetworkData);
     }
 
     @Nullable
     public HotspotNetwork getHotspotNetworkData() {
         return mHotspotNetworkData;
+    }
+
+    /**
+     * Trigger ConnectCallback with data from SharedConnectivityService.
+     * @param status HotspotNetworkConnectionStatus#ConnectionStatus enum.
+     */
+    public void onConnectionStatusChanged(@ConnectionStatus int status) {
+        if (mConnectCallback == null) return;
+        switch (status) {
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT:
+                mServerInitiatedConnection = true;
+                notifyOnUpdated();
+                break;
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_UNKNOWN_ERROR:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_PROVISIONING_FAILED:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_TETHERING_TIMEOUT:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_TETHERING_UNSUPPORTED:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_NO_CELL_DATA:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT_FAILED:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT_TIMEOUT:
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_CONNECT_TO_HOTSPOT_FAILED:
+                mCallbackHandler.post(() -> mConnectCallback.onConnectResult(
+                        ConnectCallback.CONNECT_STATUS_FAILURE_UNKNOWN));
+                mServerInitiatedConnection = false;
+                notifyOnUpdated();
+                break;
+            default:
+                // Do nothing
+        }
     }
 
     static class HotspotNetworkEntryKey {

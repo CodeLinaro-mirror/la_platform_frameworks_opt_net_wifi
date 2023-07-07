@@ -44,6 +44,10 @@
     <string name="wifitrackerlib_wifi_connected_cannot_provide_internet" msgid="3803471522215612745">"Connecté à l\'appareil. Aucune connexion Internet."</string>
     <string name="wifi_connected_low_quality" msgid="4478331645458058445">"Faible qualité"</string>
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Non autorisé par votre organisation"</string>
+    <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> de <xliff:g id="MODEL_NAME">%2$s</xliff:g>"</string>
+    <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> de <xliff:g id="DEVICE_NAME">%2$s</xliff:g>"</string>
+    <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"Connexion en cours…"</string>
+    <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"Accessible à partir de <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_wifi_security_short_eap_wpa_wpa2" msgid="4815223667006927841">"WPA/WPA2-PAE"</string>
     <string name="wifitrackerlib_wifi_security_eap_wpa_wpa2" msgid="6425661975745405271">"WPA/WPA2-Enterprise"</string>
     <string name="wifitrackerlib_wifi_security_short_eap_wpa3" msgid="6210273302049534874">"WPA3-PAE"</string>
@@ -53,7 +57,7 @@
     <string name="wifitrackerlib_wifi_security_short_eap_suiteb" msgid="6335062557041604336">"Suite-B-192"</string>
     <string name="wifitrackerlib_wifi_security_eap_suiteb" msgid="4715703239786225763">"WPA3-Enterprise 192 bits"</string>
     <string name="wifitrackerlib_wifi_security_short_wpa_wpa2" msgid="6770438383385707243">"WPA/WPA2"</string>
-    <string name="wifitrackerlib_wifi_security_wpa_wpa2" msgid="5767878305316110228">"WPA/WPA2-Personal"</string>
+    <string name="wifitrackerlib_wifi_security_wpa_wpa2" msgid="5767878305316110228">"WPA/WPA2-Personnel"</string>
     <string name="wifitrackerlib_wifi_security_short_wpa_wpa2_wpa3" msgid="4489424775550194618">"WPA/WPA2/WPA3"</string>
     <string name="wifitrackerlib_wifi_security_wpa_wpa2_wpa3" msgid="4154428413248489642">"WPA/WPA2/WPA3-Personal"</string>
     <string name="wifitrackerlib_wifi_security_wep" msgid="7714779033848180369">"WEP"</string>

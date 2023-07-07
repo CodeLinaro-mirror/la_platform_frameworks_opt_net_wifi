@@ -16,6 +16,7 @@
 
 package com.android.wifitrackerlib;
 
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.NETWORK_SELECTION_ENABLED;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.NETWORK_SELECTION_PERMANENTLY_DISABLED;
 
@@ -55,12 +56,6 @@ import androidx.core.os.BuildCompat;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CoderResult;
-import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -206,9 +201,13 @@ public class Utils {
      */
     static int getSingleSecurityTypeFromMultipleSecurityTypes(
             @NonNull List<Integer> securityTypes) {
+        if (securityTypes.size() == 0) {
+            return WifiInfo.SECURITY_TYPE_UNKNOWN;
+        }
         if (securityTypes.size() == 1) {
             return securityTypes.get(0);
-        } else if (securityTypes.size() == 2) {
+        }
+        if (securityTypes.size() == 2) {
             if (securityTypes.contains(WifiInfo.SECURITY_TYPE_OPEN)) {
                 return WifiInfo.SECURITY_TYPE_OPEN;
             }
@@ -219,111 +218,8 @@ public class Utils {
                 return WifiInfo.SECURITY_TYPE_EAP;
             }
         }
-        return WifiInfo.SECURITY_TYPE_UNKNOWN;
-    }
-
-    // Copied from @HexEncoding.java#toDigit
-    private static int toDigit(char[] str, int offset) throws IllegalArgumentException {
-        // NOTE: that this isn't really a code point in the traditional sense, since we're
-        // just rejecting surrogate pairs outright.
-        int pseudoCodePoint = str[offset];
-
-        if ('0' <= pseudoCodePoint && pseudoCodePoint <= '9') {
-            return pseudoCodePoint - '0';
-        } else if ('a' <= pseudoCodePoint && pseudoCodePoint <= 'f') {
-            return 10 + (pseudoCodePoint - 'a');
-        } else if ('A' <= pseudoCodePoint && pseudoCodePoint <= 'F') {
-            return 10 + (pseudoCodePoint - 'A');
-        }
-
-        throw new IllegalArgumentException("Illegal char: " + str[offset] + " at offset " + offset);
-    }
-
-    // Copied from @HexEncoding.java#decode
-    private static byte[] decode(char[] encoded, boolean allowSingleChar)
-            throws IllegalArgumentException {
-        int encodedLength = encoded.length;
-        int resultLengthBytes = (encodedLength + 1) / 2;
-        byte[] result = new byte[resultLengthBytes];
-
-        int resultOffset = 0;
-        int i = 0;
-        if (allowSingleChar) {
-            if ((encodedLength % 2) != 0) {
-                // Odd number of digits -- the first digit is the lower 4 bits of the first result
-                // byte.
-                result[resultOffset++] = (byte) toDigit(encoded, i);
-                i++;
-            }
-        } else {
-            if ((encodedLength % 2) != 0) {
-                throw new IllegalArgumentException("Invalid input length: " + encodedLength);
-            }
-        }
-
-        for (; i < encodedLength; i += 2) {
-            result[resultOffset++] = (byte) ((toDigit(encoded, i) << 4) | toDigit(encoded, i + 1));
-        }
-
-        return result;
-    }
-
-    // Copied from @WifiSsid.java#decodeSsid
-    private static String decodeSsid(@NonNull byte[] ssidBytes, @NonNull Charset charset) {
-        CharsetDecoder decoder = charset.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT);
-        CharBuffer out = CharBuffer.allocate(32);
-        CoderResult result = decoder.decode(ByteBuffer.wrap(ssidBytes), out, true);
-        out.flip();
-        if (result.isError()) {
-            return null;
-        }
-        return out.toString();
-    }
-
-    // copied from @NativeUtil#removeEnclosingQuotes
-    private static String removeEnclosingQuotes(String quotedStr) {
-        int length = quotedStr.length();
-        if ((length >= 2)
-                && (quotedStr.charAt(0) == '"') && (quotedStr.charAt(length - 1) == '"')) {
-            return quotedStr.substring(1, length - 1);
-        }
-        return quotedStr;
-    }
-
-    /*
-     * SSID can be Quoted plaintext OR unquoted hexadecimal of the raw bytes.
-     * This removes enclosing Quotes for plaintext, and converts unquoted
-     * hexadecimal raw bytes to readable text.
-     */
-    static String getReadableText(String ssid) {
-        // unqouted hexadecimal raw bytes
-        if (!TextUtils.isEmpty(ssid) && ssid.charAt(0) != '"') {
-            try {
-                Charset cset = null;
-                String readableText;
-                byte[] sbytes = decode(ssid.toCharArray(), false);
-
-                cset = Charset.forName("UTF-8");
-                if (cset != null) {
-                    readableText = decodeSsid(sbytes, cset);
-                    if (!TextUtils.isEmpty(readableText)) {
-                        return readableText;
-                    }
-                }
-
-                cset = Charset.forName("GBK");
-                if (cset != null) {
-                    readableText = decodeSsid(sbytes, cset);
-                    if (!TextUtils.isEmpty(readableText)) {
-                        return readableText;
-                    }
-                }
-            } catch (IllegalArgumentException e) {/* ignore */}
-        }
-
-        return removeEnclosingQuotes(ssid);
+        // Default to the first security type if we don't need any special mapping.
+        return securityTypes.get(0);
     }
 
     /**
@@ -357,11 +253,13 @@ public class Utils {
             final String suggestionOrSpecifierLabel =
                     getSuggestionOrSpecifierLabel(context, wifiConfiguration);
             if (!TextUtils.isEmpty(suggestionOrSpecifierLabel)) {
-                if (!isDefaultNetwork) {
-                    sj.add(context.getString(R.string.wifitrackerlib_available_via_app,
+                if (isDefaultNetwork || (networkCapabilities != null
+                        && NonSdkApiWrapper.isOemCapabilities(networkCapabilities))) {
+                    sj.add(context.getString(R.string.wifitrackerlib_connected_via_app,
                             suggestionOrSpecifierLabel));
                 } else {
-                    sj.add(context.getString(R.string.wifitrackerlib_connected_via_app,
+                    // Pretend that non-default, non-OEM networks are unconnected.
+                    sj.add(context.getString(R.string.wifitrackerlib_available_via_app,
                             suggestionOrSpecifierLabel));
                 }
                 shouldShowConnected = false;
@@ -511,37 +409,51 @@ public class Utils {
         }
 
         // Check for any failure messages to display
+        NetworkSelectionStatus networkSelectionStatus =
+                wifiConfiguration.getNetworkSelectionStatus();
         if (wifiConfiguration.hasNoInternetAccess()) {
-            int messageID =
-                    wifiConfiguration.getNetworkSelectionStatus().getNetworkSelectionStatus()
-                            == NETWORK_SELECTION_PERMANENTLY_DISABLED
-                            ? R.string.wifitrackerlib_wifi_no_internet_no_reconnect
-                            : R.string.wifitrackerlib_wifi_no_internet;
-            return context.getString(messageID);
-        } else if (wifiConfiguration.getNetworkSelectionStatus().getNetworkSelectionStatus()
-                != NETWORK_SELECTION_ENABLED) {
-            WifiConfiguration.NetworkSelectionStatus networkStatus =
-                    wifiConfiguration.getNetworkSelectionStatus();
-            switch (networkStatus.getNetworkSelectionDisableReason()) {
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE:
-                case WifiConfiguration.NetworkSelectionStatus
-                        .DISABLED_AUTHENTICATION_NO_SUBSCRIPTION:
+            if (networkSelectionStatus.getNetworkSelectionStatus()
+                    == NETWORK_SELECTION_PERMANENTLY_DISABLED) {
+                return context.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect);
+            }
+            return context.getString(R.string.wifitrackerlib_wifi_no_internet);
+        }
+        if (networkSelectionStatus.getNetworkSelectionStatus() != NETWORK_SELECTION_ENABLED) {
+            switch (networkSelectionStatus.getNetworkSelectionDisableReason()) {
+                case NetworkSelectionStatus.DISABLED_CONSECUTIVE_FAILURES:
+                    if (!networkSelectionStatus.hasEverConnected()
+                            && networkSelectionStatus.getDisableReasonCounter(
+                                    NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE) > 0) {
+                        return context.getString(
+                                R.string.wifitrackerlib_wifi_disabled_password_failure);
+                    }
+                    break;
+                case NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE:
+                case NetworkSelectionStatus.DISABLED_AUTHENTICATION_NO_CREDENTIALS:
+                case NetworkSelectionStatus.DISABLED_AUTHENTICATION_NO_SUBSCRIPTION:
                     return context.getString(
                             R.string.wifitrackerlib_wifi_disabled_password_failure);
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WRONG_PASSWORD:
+                case NetworkSelectionStatus.DISABLED_BY_WRONG_PASSWORD:
                     return context.getString(R.string.wifitrackerlib_wifi_check_password_try_again);
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_DHCP_FAILURE:
+                case NetworkSelectionStatus.DISABLED_DHCP_FAILURE:
                     return context.getString(R.string.wifitrackerlib_wifi_disabled_network_failure);
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_ASSOCIATION_REJECTION:
+                case NetworkSelectionStatus.DISABLED_ASSOCIATION_REJECTION:
                     return context.getString(R.string.wifitrackerlib_wifi_disabled_generic);
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT:
-                case WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY:
+                case NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT:
+                case NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY:
                     return context.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect);
                 case DISABLED_TRANSITION_DISABLE_INDICATION:
                     return context.getString(
                             R.string.wifitrackerlib_wifi_disabled_transition_disable_indication);
                 default:
                     break;
+            }
+        } else { // NETWORK_SELECTION_ENABLED
+            // Show failure message if we've gotten AUTHENTICATION_FAILURE and have never connected
+            // before, which usually indicates the credentials are wrong.
+            if (networkSelectionStatus.getDisableReasonCounter(DISABLED_AUTHENTICATION_FAILURE) > 0
+                    && !networkSelectionStatus.hasEverConnected()) {
+                return context.getString(R.string.wifitrackerlib_wifi_disabled_password_failure);
             }
         }
         switch (wifiConfiguration.getRecentFailureReason()) {

@@ -23,7 +23,6 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiInfo;
-import android.os.Handler;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -75,19 +74,6 @@ class NonSdkApiWrapper {
     }
 
     /**
-     * Registers the system default network callback.
-     */
-    static void registerSystemDefaultNetworkCallback(
-            @NonNull ConnectivityManager connectivityManager,
-            @NonNull ConnectivityManager.NetworkCallback callback,
-            @NonNull Handler handler) {
-        // registerSystemDefaultNetworkCallback does not have visibility to non-updatable modules,
-        // so we have to use the regular registerDefaultNetworkCallback here.
-        // TODO(b/230643853): See if we can add registerSystemDefaultNetworkCallback to the SDK.
-        connectivityManager.registerDefaultNetworkCallback(callback, handler);
-    }
-
-    /**
      * Returns true if the WifiInfo is for the primary network, false otherwise.
      */
     static boolean isPrimary(@NonNull WifiInfo wifiInfo) {
@@ -95,6 +81,16 @@ class NonSdkApiWrapper {
         //                    access, which SUW does not hold. Always return true (WifiTracker1
         //                    behavior) until SUW can access this field.
         return true;
+    }
+
+    /**
+     * Returns true if the NetworkCapabilities is OEM_PAID or OEM_PRIVATE
+     */
+    static boolean isOemCapabilities(@NonNull NetworkCapabilities capabilities) {
+        // SUW can't access NET_CAPABILITY_OEM_PAID or NET_CAPABILITY_OEM_PRIVATE since they aren't
+        // public APIs. Return false here since we don't need to worry about secondary OEM networks
+        // in SUW for now.
+        return false;
     }
 
     /**

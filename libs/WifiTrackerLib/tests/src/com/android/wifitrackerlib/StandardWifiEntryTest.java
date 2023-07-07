@@ -19,8 +19,9 @@ package com.android.wifitrackerlib;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_AUTHENTICATION_NO_CREDENTIALS;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WRONG_PASSWORD;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_CONSECUTIVE_FAILURES;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.NETWORK_SELECTION_ENABLED;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.NETWORK_SELECTION_PERMANENTLY_DISABLED;
-import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.NETWORK_SELECTION_TEMPORARY_DISABLED;
 import static android.net.wifi.WifiInfo.SECURITY_TYPE_EAP;
 import static android.net.wifi.WifiInfo.SECURITY_TYPE_OPEN;
 import static android.net.wifi.WifiInfo.SECURITY_TYPE_OWE;
@@ -42,7 +43,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -84,6 +84,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.MockitoSession;
 
@@ -466,27 +467,15 @@ public class StandardWifiEntryTest {
         try {
             ExtendedMockito.doReturn(false)
                     .when(() -> NonSdkApiWrapper.isPrimary(mMockWifiInfo));
-            // OEM-Paid
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PAID)).thenReturn(true);
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE)).thenReturn(false);
-            entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
-            assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_CONNECTED);
-
-            // OEM-Private
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PAID)).thenReturn(false);
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE)).thenReturn(true);
+            // Is OEM
+            ExtendedMockito.doReturn(true)
+                    .when(() -> NonSdkApiWrapper.isOemCapabilities(mMockNetworkCapabilities));
             entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
             assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_CONNECTED);
 
             // Not OEM anymore
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PAID)).thenReturn(false);
-            when(mMockNetworkCapabilities.hasCapability(
-                    NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE)).thenReturn(false);
+            ExtendedMockito.doReturn(false)
+                    .when(() -> NonSdkApiWrapper.isOemCapabilities(mMockNetworkCapabilities));
             entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
             assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_DISCONNECTED);
         } finally {
@@ -838,39 +827,29 @@ public class StandardWifiEntryTest {
         // Disconnected should return false;
         assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
 
-        // Not validated, Not Default
+        // Connected but validation attempt not complete, should not show X level icon yet.
         when(mMockWifiInfo.getNetworkId()).thenReturn(networkId);
         when(mMockWifiInfo.getRssi()).thenReturn(TestUtils.GOOD_RSSI);
-
         entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
-
-        // Validation attempt not complete, should not show X level icon yet.
         assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
 
-        // Validation attempt complete, should show X level icon now.
+        // Validation attempt complete, should show X level icon.
         ConnectivityDiagnosticsManager.ConnectivityReport connectivityReport = mock(
                 ConnectivityDiagnosticsManager.ConnectivityReport.class);
         when(connectivityReport.getNetwork()).thenReturn(mMockNetwork);
         entry.updateConnectivityReport(connectivityReport);
         assertThat(entry.shouldShowXLevelIcon()).isEqualTo(true);
 
-        // Not Validated, Default
-        entry.onDefaultNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
-
-        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(true);
-
-        // Validated, Default
+        // Internet validated, should not show X level icon.
         when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
                 .thenReturn(true);
         entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
-
         assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
 
-        // Validated, Not Default
-        Network otherNetwork = mock(Network.class);
-        when(otherNetwork.getNetId()).thenReturn(2);
-        entry.onDefaultNetworkCapabilitiesChanged(otherNetwork, new NetworkCapabilities());
-
+        // Cell becomes default (i.e. low quality wifi), show X level icon.
+        entry.onDefaultNetworkCapabilitiesChanged(Mockito.mock(Network.class),
+                new NetworkCapabilities.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR).build());
         assertThat(entry.shouldShowXLevelIcon()).isEqualTo(true);
     }
 
@@ -1125,7 +1104,6 @@ public class StandardWifiEntryTest {
 
     @Test
     public void testShouldEditBeforeConnect_authenticationFailure_returnTrue() {
-        // Test DISABLED_AUTHENTICATION_FAILURE.
         WifiConfiguration wifiConfig = spy(new WifiConfiguration());
         wifiConfig.SSID = "\"ssid\"";
         wifiConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
@@ -1134,38 +1112,68 @@ public class StandardWifiEntryTest {
                 ssidAndSecurityTypeToStandardWifiEntryKey("ssid", SECURITY_TYPE_PSK),
                 Collections.singletonList(wifiConfig), null, mMockWifiManager,
                 false /* forSavedNetworksPage */);
-        NetworkSelectionStatus.Builder statusBuilder = new NetworkSelectionStatus.Builder();
-        NetworkSelectionStatus networkSelectionStatus = spy(statusBuilder.setNetworkSelectionStatus(
-                NETWORK_SELECTION_TEMPORARY_DISABLED)
-                .setNetworkSelectionDisableReason(
-                        DISABLED_AUTHENTICATION_FAILURE)
-                .build());
-        doReturn(1).when(networkSelectionStatus).getDisableReasonCounter(
-                DISABLED_AUTHENTICATION_FAILURE);
-        doReturn(true).when(networkSelectionStatus).hasEverConnected();
-        doReturn(networkSelectionStatus).when(wifiConfig).getNetworkSelectionStatus();
+        NetworkSelectionStatus networkSelectionStatus = mock(NetworkSelectionStatus.class);
+        when(wifiConfig.getNetworkSelectionStatus()).thenReturn(networkSelectionStatus);
 
+        String saved = "Saved";
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disconnected)).thenReturn(saved);
+        String separator = " / ";
+        when(mMockContext.getString(R.string.wifitrackerlib_summary_separator))
+                .thenReturn(separator);
+        String disabledPasswordFailure = "disabledPasswordFailure";
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disabled_password_failure))
+                .thenReturn(disabledPasswordFailure);
+        String checkPasswordTryAgain = "checkPasswordTryAgain";
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_check_password_try_again))
+                .thenReturn(checkPasswordTryAgain);
+
+        // Test DISABLED_AUTHENTICATION_FAILURE for never connected network
+        when(networkSelectionStatus.hasEverConnected()).thenReturn(false);
+        when(networkSelectionStatus.getNetworkSelectionStatus())
+                .thenReturn(NETWORK_SELECTION_ENABLED);
+        when(networkSelectionStatus.getDisableReasonCounter(DISABLED_AUTHENTICATION_FAILURE))
+                .thenReturn(1);
         assertThat(entry.shouldEditBeforeConnect()).isTrue();
+        assertThat(entry.getSummary()).isEqualTo(saved + separator + disabledPasswordFailure);
+
+        // Test DISABLED_AUTHENTICATION_FAILURE for a previously connected network
+        when(networkSelectionStatus.hasEverConnected()).thenReturn(true);
+        when(networkSelectionStatus.getNetworkSelectionStatus())
+                .thenReturn(NETWORK_SELECTION_PERMANENTLY_DISABLED);
+        when(networkSelectionStatus.getNetworkSelectionDisableReason())
+                .thenReturn(DISABLED_AUTHENTICATION_FAILURE);
+        when(wifiConfig.hasNoInternetAccess()).thenReturn(false);
+        assertThat(entry.shouldEditBeforeConnect()).isTrue();
+        assertThat(entry.getSummary()).isEqualTo(saved + separator + disabledPasswordFailure);
+
+        // Test DISABLED_CONSECUTIVE_FAILURES with some DISABLED_AUTHENTICATION_FAILURE
+        when(networkSelectionStatus.hasEverConnected()).thenReturn(false);
+        when(networkSelectionStatus.getNetworkSelectionStatus())
+                .thenReturn(NETWORK_SELECTION_PERMANENTLY_DISABLED);
+        when(networkSelectionStatus.getNetworkSelectionDisableReason())
+                .thenReturn(DISABLED_CONSECUTIVE_FAILURES);
+        when(networkSelectionStatus.getDisableReasonCounter(DISABLED_AUTHENTICATION_FAILURE))
+                .thenReturn(3);
+        assertThat(entry.shouldEditBeforeConnect()).isTrue();
+        assertThat(entry.getSummary()).isEqualTo(saved + separator + disabledPasswordFailure);
 
         // Test DISABLED_BY_WRONG_PASSWORD.
-        networkSelectionStatus = spy(statusBuilder.setNetworkSelectionStatus(
-                NETWORK_SELECTION_PERMANENTLY_DISABLED)
-                .setNetworkSelectionDisableReason(DISABLED_BY_WRONG_PASSWORD)
-                .build());
-        doReturn(1).when(networkSelectionStatus).getDisableReasonCounter(
-                DISABLED_BY_WRONG_PASSWORD);
-
+        when(networkSelectionStatus.hasEverConnected()).thenReturn(false);
+        when(networkSelectionStatus.getNetworkSelectionStatus())
+                .thenReturn(NETWORK_SELECTION_PERMANENTLY_DISABLED);
+        when(networkSelectionStatus.getNetworkSelectionDisableReason())
+                .thenReturn(DISABLED_BY_WRONG_PASSWORD);
         assertThat(entry.shouldEditBeforeConnect()).isTrue();
+        assertThat(entry.getSummary()).isEqualTo(saved + separator + checkPasswordTryAgain);
 
         // Test DISABLED_AUTHENTICATION_NO_CREDENTIALS.
-        networkSelectionStatus = spy(statusBuilder.setNetworkSelectionStatus(
-                NETWORK_SELECTION_PERMANENTLY_DISABLED)
-                .setNetworkSelectionDisableReason(DISABLED_AUTHENTICATION_NO_CREDENTIALS)
-                .build());
-        doReturn(1).when(networkSelectionStatus).getDisableReasonCounter(
-                DISABLED_AUTHENTICATION_NO_CREDENTIALS);
-
+        when(networkSelectionStatus.hasEverConnected()).thenReturn(false);
+        when(networkSelectionStatus.getNetworkSelectionStatus())
+                .thenReturn(NETWORK_SELECTION_PERMANENTLY_DISABLED);
+        when(networkSelectionStatus.getNetworkSelectionDisableReason())
+                .thenReturn(DISABLED_AUTHENTICATION_NO_CREDENTIALS);
         assertThat(entry.shouldEditBeforeConnect()).isTrue();
+        assertThat(entry.getSummary()).isEqualTo(saved + separator + disabledPasswordFailure);
     }
 
     @Test

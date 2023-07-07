@@ -25,7 +25,6 @@ import android.net.NetworkCapabilities;
 import android.net.TransportInfo;
 import android.net.vcn.VcnTransportInfo;
 import android.net.wifi.WifiInfo;
-import android.os.Handler;
 import android.os.UserManager;
 import android.text.Annotation;
 import android.text.SpannableString;
@@ -111,20 +110,18 @@ class NonSdkApiWrapper {
     }
 
     /**
-     * Registers the default network callback.
-     */
-    static void registerSystemDefaultNetworkCallback(
-            @NonNull ConnectivityManager connectivityManager,
-            @NonNull ConnectivityManager.NetworkCallback callback,
-            @NonNull Handler handler) {
-        connectivityManager.registerSystemDefaultNetworkCallback(callback, handler);
-    }
-
-    /**
      * Returns true if the WifiInfo is for the primary network, false otherwise.
      */
     static boolean isPrimary(@NonNull WifiInfo wifiInfo) {
         return wifiInfo.isPrimary();
+    }
+
+    /**
+     * Returns true if the NetworkCapabilities is OEM_PAID or OEM_PRIVATE
+     */
+    static boolean isOemCapabilities(@NonNull NetworkCapabilities capabilities) {
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_OEM_PAID)
+                || capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_OEM_PRIVATE);
     }
 
     /**

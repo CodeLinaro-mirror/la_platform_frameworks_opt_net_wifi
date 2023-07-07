@@ -52,11 +52,13 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiConfiguration.NetworkSelectionStatus;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -66,6 +68,7 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -80,10 +83,8 @@ import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -103,13 +104,13 @@ public class StandardWifiEntry extends WifiEntry {
     @NonNull private final StandardWifiEntryKey mKey;
 
     @NonNull private final WifiTrackerInjector mInjector;
-    @NonNull private final Context mContext;
+    @NonNull protected final Context mContext;
 
     // Map of security type to matching scan results
-    @NonNull private final Map<Integer, List<ScanResult>> mMatchingScanResults = new HashMap<>();
+    @NonNull private final Map<Integer, List<ScanResult>> mMatchingScanResults = new ArrayMap<>();
     // Map of security type to matching WifiConfiguration
     // TODO: Change this to single WifiConfiguration once we can get multiple security type configs.
-    @NonNull private final Map<Integer, WifiConfiguration> mMatchingWifiConfigs = new HashMap<>();
+    @NonNull private final Map<Integer, WifiConfiguration> mMatchingWifiConfigs = new ArrayMap<>();
 
     // List of the target scan results to be displayed. This should match the highest available
     // security from all of the matched WifiConfigurations.
@@ -181,9 +182,6 @@ public class StandardWifiEntry extends WifiEntry {
 
     @Override
     public String getTitle() {
-        if (isGbkSsidSupported()) {
-            return Utils.getReadableText(mKey.getScanResultKey().getSsid());
-        }
         return mKey.getScanResultKey().getSsid();
     }
 
@@ -354,32 +352,20 @@ public class StandardWifiEntry extends WifiEntry {
             if (mTargetSecurityTypes.contains(SECURITY_TYPE_OWE)) {
                 // OWE network
                 final WifiConfiguration oweConfig = new WifiConfiguration();
-                if (isGbkSsidSupported()) {
-                    oweConfig.SSID = mKey.getScanResultKey().getSsid();
-                } else {
-                    oweConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
-                }
+                oweConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
                 oweConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OWE);
                 mWifiManager.connect(oweConfig, new ConnectActionListener());
                 if (mTargetSecurityTypes.contains(SECURITY_TYPE_OPEN)) {
                     // Add an extra Open config for OWE transition networks
                     final WifiConfiguration openConfig = new WifiConfiguration();
-                    if (isGbkSsidSupported()) {
-                        openConfig.SSID = mKey.getScanResultKey().getSsid();
-                    } else {
-                        openConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
-                    }
+                    openConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
                     openConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OPEN);
                     mWifiManager.save(openConfig, null);
                 }
             } else if (mTargetSecurityTypes.contains(SECURITY_TYPE_OPEN)) {
                 // Open network
                 final WifiConfiguration openConfig = new WifiConfiguration();
-                if (isGbkSsidSupported()) {
-                    openConfig.SSID = mKey.getScanResultKey().getSsid();
-                } else {
-                    openConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
-                }
+                openConfig.SSID = "\"" + mKey.getScanResultKey().getSsid() + "\"";
                 openConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_OPEN);
                 mWifiManager.connect(openConfig, new ConnectActionListener());
             } else {
@@ -409,12 +395,7 @@ public class StandardWifiEntry extends WifiEntry {
                             DisconnectCallback.DISCONNECT_STATUS_FAILURE_UNKNOWN);
                 }
             }, 10_000 /* delayMillis */);
-            if (!isGbkSsidSupported()) {
-                mWifiManager.disableEphemeralNetwork(
-                   "\"" + mKey.getScanResultKey().getSsid() + "\"");
-            } else {
-                mWifiManager.disableEphemeralNetwork(mKey.getScanResultKey().getSsid());
-            }
+            mWifiManager.disableEphemeralNetwork("\"" + mKey.getScanResultKey().getSsid() + "\"");
             mWifiManager.disconnect();
         }
     }
@@ -710,7 +691,8 @@ public class StandardWifiEntry extends WifiEntry {
 
         // The network is disabled because of one of the authentication problems.
         NetworkSelectionStatus networkSelectionStatus = wifiConfig.getNetworkSelectionStatus();
-        if (networkSelectionStatus.getNetworkSelectionStatus() != NETWORK_SELECTION_ENABLED) {
+        if (networkSelectionStatus.getNetworkSelectionStatus() != NETWORK_SELECTION_ENABLED
+                || !networkSelectionStatus.hasEverConnected()) {
             if (networkSelectionStatus.getDisableReasonCounter(DISABLED_AUTHENTICATION_FAILURE) > 0
                     || networkSelectionStatus.getDisableReasonCounter(
                     DISABLED_BY_WRONG_PASSWORD) > 0
@@ -730,14 +712,10 @@ public class StandardWifiEntry extends WifiEntry {
 
         final String ssid = mKey.getScanResultKey().getSsid();
         for (ScanResult scan : scanResults) {
-            String tmpSsid = scan.SSID;
-            if (isGbkSsidSupported()) {
-                tmpSsid = scan.getWifiSsid().toString();
-            }
-            if (!TextUtils.equals(tmpSsid, ssid)) {
+            if (!TextUtils.equals(scan.SSID, ssid)) {
                 throw new IllegalArgumentException(
                         "Attempted to update with wrong SSID! Expected: "
-                                + ssid + ", Actual: " + tmpSsid + ", ScanResult: " + scan);
+                                + ssid + ", Actual: " + scan.SSID + ", ScanResult: " + scan);
             }
         }
         // Populate the cached scan result map
@@ -801,11 +779,7 @@ public class StandardWifiEntry extends WifiEntry {
         final Set<Integer> securityTypes = scanResultKey.getSecurityTypes();
         mMatchingWifiConfigs.clear();
         for (WifiConfiguration config : wifiConfigs) {
-            String tmpSsid = config.SSID;
-            if (!isGbkSsidSupported()) {
-                tmpSsid = sanitizeSsid(config.SSID);
-            }
-            if (!TextUtils.equals(ssid, tmpSsid)) {
+            if (!TextUtils.equals(ssid, sanitizeSsid(config.SSID))) {
                 throw new IllegalArgumentException(
                         "Attempted to update with wrong SSID!"
                                 + " Expected: " + ssid
@@ -993,7 +967,7 @@ public class StandardWifiEntry extends WifiEntry {
     }
 
     // TODO(b/227622961): Remove the suppression once the linter recognizes BuildCompat.isAtLeastT()
-    @SuppressLint("NewApi")
+    @SuppressLint({"NewApi", "SwitchIntDef"})
     private synchronized String getScanResultDescription(ScanResult scanResult, long nowMs) {
         final StringBuilder description = new StringBuilder();
         description.append(" \n{");
@@ -1008,8 +982,35 @@ public class StandardWifiEntry extends WifiEntry {
         if (BuildCompat.isAtLeastT() && wifiStandard == ScanResult.WIFI_STANDARD_11BE) {
             description.append(",mldMac=").append(scanResult.getApMldMacAddress());
             description.append(",linkId=").append(scanResult.getApMloLinkId());
-            description.append(",affLinks=").append(
-                    Arrays.toString(scanResult.getAffiliatedMloLinks().toArray()));
+            description.append(",affLinks=");
+            StringJoiner affLinks = new StringJoiner(",", "[", "]");
+            for (MloLink link : scanResult.getAffiliatedMloLinks()) {
+                final int scanResultBand;
+                switch (link.getBand()) {
+                    case WifiScanner.WIFI_BAND_24_GHZ:
+                        scanResultBand = ScanResult.WIFI_BAND_24_GHZ;
+                        break;
+                    case WifiScanner.WIFI_BAND_5_GHZ:
+                        scanResultBand = ScanResult.WIFI_BAND_5_GHZ;
+                        break;
+                    case WifiScanner.WIFI_BAND_6_GHZ:
+                        scanResultBand = ScanResult.WIFI_BAND_6_GHZ;
+                        break;
+                    case WifiScanner.WIFI_BAND_60_GHZ:
+                        scanResultBand = ScanResult.WIFI_BAND_60_GHZ;
+                        break;
+                    default:
+                        Log.e(TAG, "Unknown MLO link band: " + link.getBand());
+                        scanResultBand = ScanResult.UNSPECIFIED;
+                        break;
+                }
+                affLinks.add(new StringJoiner(",", "{", "}")
+                        .add("apMacAddr=" + link.getApMacAddress())
+                        .add("freq=" + ScanResult.convertChannelToFrequencyMhzIfSupported(
+                                link.getChannel(), scanResultBand))
+                        .toString());
+            }
+            description.append(affLinks.toString());
         }
         final int ageSeconds = (int) (nowMs - scanResult.timestamp / 1000) / 1000;
         description.append(",").append(ageSeconds).append("s");
@@ -1062,25 +1063,15 @@ public class StandardWifiEntry extends WifiEntry {
                 int policyType = policy.getPolicyType();
                 Set<WifiSsid> ssids = policy.getSsids();
 
-                String ssid;
-                if (isGbkSsidSupported()) {
-                    ssid = getSsid();
-                } else {
-                    ssid = "\"" + getSsid() + "\"";
-                }
-
-                boolean isContained = false;
-                try {
-                    isContained = ssids.contains(WifiSsid.fromString(ssid));
-                } catch (IllegalArgumentException e) {
-                    Log.e(TAG, "updateAdminRestrictions e = " + e);
-                }
-
-                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST && !isContained) {
+                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST
+                        && !ssids.contains(
+                        WifiSsid.fromBytes(getSsid().getBytes(StandardCharsets.UTF_8)))) {
                     mIsAdminRestricted = true;
                     return;
                 }
-                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_DENYLIST && isContained) {
+                if (policyType == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_DENYLIST
+                        && ssids.contains(
+                        WifiSsid.fromBytes(getSsid().getBytes(StandardCharsets.UTF_8)))) {
                     mIsAdminRestricted = true;
                     return;
                 }
@@ -1299,16 +1290,14 @@ public class StandardWifiEntry extends WifiEntry {
          * @param scanResult
          */
         ScanResultKey(@NonNull ScanResult scanResult) {
-            this(WifiEntry.isGbkSsidSupported() ? scanResult.getWifiSsid().toString() :
-                        scanResult.SSID, getSecurityTypesFromScanResult(scanResult));
+            this(scanResult.SSID, getSecurityTypesFromScanResult(scanResult));
         }
 
         /**
          * Creates a ScanResultKey from a WifiConfiguration's SSID and security type grouping.
          */
         ScanResultKey(@NonNull WifiConfiguration wifiConfiguration) {
-            this(WifiEntry.isGbkSsidSupported() ? wifiConfiguration.SSID :
-                    sanitizeSsid(wifiConfiguration.SSID),
+            this(sanitizeSsid(wifiConfiguration.SSID),
                     getSecurityTypesFromWifiConfiguration(wifiConfiguration));
         }
 

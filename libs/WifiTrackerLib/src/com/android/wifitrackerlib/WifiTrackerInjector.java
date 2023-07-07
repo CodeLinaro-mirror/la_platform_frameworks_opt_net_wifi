@@ -19,8 +19,6 @@ package com.android.wifitrackerlib;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.os.UserManager;
-import android.content.res.Resources;
-import android.util.Log;
 import android.util.ArraySet;
 
 import androidx.annotation.NonNull;
@@ -36,54 +34,9 @@ class WifiTrackerInjector {
     private final DevicePolicyManager mDevicePolicyManager;
     @NonNull private final Set<String> mNoAttributionAnnotationPackages;
 
-    private final static String TAG = "WifiTrackerInjector";
-    private final static String WIFI_RES_PACKAGE = "com.android.wifi.resources";
-    private static Context mContext;
-    private static Context mWifiResContext;
-    private static Resources mWifiRes;
-    private static boolean mGbkSsidSupported;
-
-    public static boolean isGbkSsidSupported() {
-        return mGbkSsidSupported;
-    }
-
-    private void initializeWifiRes() {
-        if (mWifiRes != null) {
-            return;
-        }
-        try {
-            mWifiResContext = mContext.createPackageContext(WIFI_RES_PACKAGE,
-                Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
-        } catch (Exception e) {
-            Log.e(TAG, "exception in createPackageContext: " + e);
-            throw new RuntimeException(e);
-        }
-        mWifiRes = mWifiResContext.getResources();
-        int resId = getWifiResId(
-                    "bool", "config_vendor_wifi_gbk_ssid_supported");
-        mGbkSsidSupported = mWifiRes.getBoolean(resId);
-        int resId2 = getWifiResId(
-                     "array", "config_wifiCharsetsForSsidTranslation");
-        if (resId2 != 0) {
-            String[] charsets = mWifiRes.getStringArray(resId2);
-            if (charsets != null && charsets.length != 0) {
-                mGbkSsidSupported = false;
-            }
-        }
-    }
-
-    private int getWifiResId(String category, String name) {
-        if (mWifiRes == null) {
-            Log.e(TAG, "no WIFI resources, fail to get " + category + "." + name);
-            return -1;
-        }
-        return mWifiRes.getIdentifier(name, category, WIFI_RES_PACKAGE);
-    }
-
     // TODO(b/201571677): Migrate the rest of the common objects to WifiTrackerInjector.
     WifiTrackerInjector(@NonNull Context context) {
         mIsDemoMode = NonSdkApiWrapper.isDemoMode(context);
-        mContext = context;
         mUserManager = context.getSystemService(UserManager.class);
         mDevicePolicyManager = context.getSystemService(DevicePolicyManager.class);
         mNoAttributionAnnotationPackages = new ArraySet<>();
@@ -92,7 +45,6 @@ class WifiTrackerInjector {
         for (int i = 0; i < noAttributionAnnotationPackages.length; i++) {
             mNoAttributionAnnotationPackages.add(noAttributionAnnotationPackages[i]);
         }
-        initializeWifiRes();
     }
 
     boolean isDemoMode() {
