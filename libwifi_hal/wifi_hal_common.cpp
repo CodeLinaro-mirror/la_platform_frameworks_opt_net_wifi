@@ -25,7 +25,6 @@
 #include <cutils/misc.h>
 #include <cutils/properties.h>
 #include <sys/syscall.h>
-#include <android-base/properties.h>
 
 extern "C" int init_module(void *, unsigned long, const char *);
 extern "C" int delete_module(const char *, unsigned int);
@@ -82,12 +81,6 @@ static int rmmod(const char *modname) {
   int ret = -1;
   int maxtry = 10;
 
-  std::string powerCtl = android::base::GetProperty("sys.powerctl", "");
-  if (!powerCtl.empty()) {
-    PLOG(ERROR) << powerCtl<<" :skipping rmmod";
-    return ret;
-  }
-
   while (maxtry-- > 0) {
     ret = delete_module(modname, O_NONBLOCK | O_EXCL);
     if (ret < 0 && errno == EAGAIN)
@@ -113,7 +106,7 @@ int wifi_change_driver_state(const char *state) {
 
   if (!state) return -1;
   do {
-    if (access(WIFI_DRIVER_STATE_CTRL_PARAM, R_OK|W_OK) == 0)
+    if (access(WIFI_DRIVER_STATE_CTRL_PARAM, W_OK) == 0)
       break;
     nanosleep(&req, (struct timespec *)NULL);
   } while (--count > 0);
