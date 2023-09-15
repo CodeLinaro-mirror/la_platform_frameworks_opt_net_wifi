@@ -198,7 +198,7 @@ wifi_cc_defaults {
                 defaults: ["google_wifi_config_lib_defaults"],
             },
             qcwcn: {
-                shared_libs: ["libcld80211", "libcrypto"],
+                shared_libs: ["libcld80211", "libcrypto", "libpasn"],
             },
         },
     },
@@ -381,6 +381,38 @@ wifi_cc_prebuilt_library_shared {
 wifi_makefile_goal {
     name: "make-libcld80211",
     product_out_path: "obj/SHARED_LIBRARIES/libcld80211_intermediates/LINKED/libcld80211.so",
+    enabled: false,
+    soong_config_variables: {
+        board_wlan_device: {
+            qcwcn: {
+                enabled: true,
+            },
+        },
+    },
+}
+
+// libpasn
+
+wifi_cc_prebuilt_library_shared {
+    name: "libpasn",
+    vendor: true,
+    srcs: [":make-libpasn"],
+    compile_multilib: "first",
+    installable: false,
+    licenses: ["libwifi_hal_bsd_license"],
+    enabled: false,
+    soong_config_variables: {
+        board_wlan_device: {
+            qcwcn: {
+                enabled: true,
+            },
+        },
+    },
+}
+
+wifi_makefile_goal {
+    name: "make-libpasn",
+    product_out_path: "obj/SHARED_LIBRARIES/libpasn_intermediates/LINKED/libpasn.so",
     enabled: false,
     soong_config_variables: {
         board_wlan_device: {
