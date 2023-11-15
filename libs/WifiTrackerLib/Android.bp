@@ -13,10 +13,6 @@ java_defaults {
         "WifiTrackerLibRes",
         "SettingsLibHelpUtils",
     ],
-    defaults: [
-        "framework-wifi-vendor-hide-access-defaults",
-    ],
-
     min_sdk_version: "S",
 }
 
