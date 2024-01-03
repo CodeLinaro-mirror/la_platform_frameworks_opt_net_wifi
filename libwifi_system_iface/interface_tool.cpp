@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "wifi_system/interface_tool.h"
 
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 
 #include <linux/if_bridge.h>
 #include <string.h>
@@ -28,11 +36,16 @@
 /* We need linux/if.h for flags like IFF_UP.  Sadly, it forward declares
    struct sockaddr and must be included after sys/socket.h. */
 #include <linux/if.h>
+#include <linux/sockios.h>
 
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
 
+#include <cutils/memory.h>
+
+#ifndef IFNAMSIZ
 #define IFNAMSIZ    16
+#endif
 
 namespace android {
 namespace wifi_system {
@@ -164,7 +177,7 @@ std::array<uint8_t, ETH_ALEN> InterfaceTool::GetFactoryMacAddress(const char* if
 
   epaddr->cmd = ETHTOOL_GPERMADDR;
   epaddr->size = ETH_ALEN;
-  ifr.ifr_data = epaddr;
+  ifr.ifr_data = (char *)epaddr;
 
   if (TEMP_FAILURE_RETRY(ioctl(sock.get(), SIOCETHTOOL, &ifr)) != 0) {
     LOG(ERROR) << "Could not get factory address MAC for " << if_name

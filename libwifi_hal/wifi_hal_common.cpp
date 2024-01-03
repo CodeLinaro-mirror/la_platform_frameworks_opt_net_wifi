@@ -14,16 +14,24 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "hardware_legacy/wifi.h"
 
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <string.h>
 
 #include <android-base/logging.h>
 #include <cutils/misc.h>
-#include <cutils/properties.h>
+//#include <cutils/properties.h>
 #include <sys/syscall.h>
 
 extern "C" int init_module(void *, unsigned long, const char *);
@@ -43,7 +51,10 @@ extern "C" int delete_module(const char *, unsigned int);
 #define WIFI_DRIVER_MODULE_ARG ""
 #endif
 
-static const char DRIVER_PROP_NAME[] = "wlan.driver.status";
+#ifndef WIFI_DRIVER_STATE_CTRL_PARAM
+#define WIFI_DRIVER_STATE_CTRL_PARAM "/dev/wlan"
+#endif
+
 static bool is_driver_loaded = false;
 #ifdef WIFI_DRIVER_MODULE_PATH
 static const char DRIVER_MODULE_NAME[] = WIFI_DRIVER_MODULE_NAME;
@@ -53,10 +64,17 @@ static const char DRIVER_MODULE_ARG[] = WIFI_DRIVER_MODULE_ARG;
 static const char MODULE_FILE[] = "/proc/modules";
 #endif
 
+#ifndef WIFI_DRIVER_FW_PATH_PARAM
+#define WIFI_DRIVER_FW_PATH_PARAM "/sys/module/wlan/parameters/fwpath"
+#endif
+
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
+#define WIFI_DRIVER_STATE_ON "ON"
+#define WIFI_DRIVER_STATE_OFF "OFF"
 int kDriverStateAccessRetrySleepMillis = 200;
 #endif
 
+#ifdef WIFI_DRIVER_MODULE_PATH
 static int insmod(const char *filename, const char *args) {
   int ret;
   int fd;
@@ -90,9 +108,10 @@ static int rmmod(const char *modname) {
   }
 
   if (ret != 0)
-    PLOG(DEBUG) << "Unable to unload driver module '" << modname << "'";
+    PLOG(ERROR) << "Unable to unload driver module '" << modname << "'";
   return ret;
 }
+#endif
 
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
 int wifi_change_driver_state(const char *state) {
@@ -131,19 +150,17 @@ int wifi_change_driver_state(const char *state) {
 #endif
 
 int is_wifi_driver_loaded() {
-  char driver_status[PROPERTY_VALUE_MAX];
 #ifdef WIFI_DRIVER_MODULE_PATH
   FILE *proc;
   char line[sizeof(DRIVER_MODULE_TAG) + 10];
 #endif
 
-  if (!property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
-    return 0; /* driver not loaded */
+#ifdef WIFI_DRIVER_STATE_CTRL_PARAM
+  if (access(WIFI_DRIVER_STATE_CTRL_PARAM, W_OK) == 0) {
+      is_driver_loaded = true;
+      return 1; /* /dev/wlan created, driver loaded. */
   }
-
-  if (!is_driver_loaded) {
-    return 0;
-  } /* driver not loaded */
+#endif
 
 #ifdef WIFI_DRIVER_MODULE_PATH
   /*
@@ -153,58 +170,52 @@ int is_wifi_driver_loaded() {
    * crash.
    */
   if ((proc = fopen(MODULE_FILE, "r")) == NULL) {
-    PLOG(WARNING) << "Could not open " << MODULE_FILE;
+    PLOG(ERROR) << "Could not open " << MODULE_FILE;
     is_driver_loaded = false;
-    if (strcmp(driver_status, "unloaded") != 0) {
-      property_set(DRIVER_PROP_NAME, "unloaded");
-    }
     return 0;
   }
   while ((fgets(line, sizeof(line), proc)) != NULL) {
     if (strncmp(line, DRIVER_MODULE_TAG, strlen(DRIVER_MODULE_TAG)) == 0) {
       fclose(proc);
+      is_driver_loaded = true;
       return 1;
     }
   }
   fclose(proc);
   is_driver_loaded = false;
-  if (strcmp(driver_status, "unloaded") != 0) {
-    property_set(DRIVER_PROP_NAME, "unloaded");
-  }
   return 0;
-#else
-  return 1;
 #endif
+
+  return is_driver_loaded ? 1 : 0;
 }
 
 int wifi_load_driver() {
+  if (!is_wifi_driver_loaded()) {
 #ifdef WIFI_DRIVER_MODULE_PATH
-  if (is_wifi_driver_loaded()) {
-    return 0;
-  }
-
-  if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0) return -1;
+    if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
+      return -1;
+    is_driver_loaded = true;
+#else
+    PLOG(ERROR) << "No driver loaded.";
+    return -1;
 #endif
+  }
 
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
-  if (is_wifi_driver_loaded()) {
-    return 0;
-  }
-
   if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0) {
+    PLOG(ERROR) << "Driver unloading, err='fail to change driver state'";
 #ifdef WIFI_DRIVER_MODULE_PATH
-    PLOG(WARNING) << "Driver unloading, err='fail to change driver state'";
     if (rmmod(DRIVER_MODULE_NAME) == 0) {
-      PLOG(DEBUG) << "Driver unloaded";
+      PLOG(INFO) << "Driver unloaded";
+      is_driver_loaded = false;
     } else {
-      // Set driver prop to "ok", expect HL to restart Wi-Fi.
-      PLOG(DEBUG) << "Driver unload failed! set driver prop to 'ok'.";
-      property_set(DRIVER_PROP_NAME, "ok");
+      PLOG(ERROR) << "Driver unload failed!";
     }
 #endif
     return -1;
   }
 #endif
+
   is_driver_loaded = true;
   return 0;
 }
@@ -213,7 +224,13 @@ int wifi_unload_driver() {
   if (!is_wifi_driver_loaded()) {
     return 0;
   }
-#ifdef WIFI_DRIVER_MODULE_PATH
+
+#if defined(WIFI_DRIVER_STATE_CTRL_PARAM)
+  if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0) {
+    PLOG(ERROR) << "Change Driver state off fail";
+    return -1;
+  }
+#elif defined(WIFI_DRIVER_MODULE_PATH)
   if (rmmod(DRIVER_MODULE_NAME) == 0) {
     int count = 20; /* wait at most 10 seconds for completion */
     while (count-- > 0) {
@@ -227,16 +244,10 @@ int wifi_unload_driver() {
     return -1;
   } else
     return -1;
-#else
-#ifdef WIFI_DRIVER_STATE_CTRL_PARAM
-  if (is_wifi_driver_loaded()) {
-    if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0) return -1;
-  }
 #endif
+
   is_driver_loaded = false;
-  property_set(DRIVER_PROP_NAME, "unloaded");
   return 0;
-#endif
 }
 
 const char *wifi_get_fw_path(int fw_type) {

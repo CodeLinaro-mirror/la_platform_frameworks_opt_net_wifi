@@ -14,12 +14,20 @@
  * limitations under the License.
  */
 
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #ifndef ANDROID_WIFI_SYSTEM_INTERFACE_TOOL_H
 #define ANDROID_WIFI_SYSTEM_INTERFACE_TOOL_H
 
 #include <array>
 #include <cstdint>
 #include <linux/if_ether.h>
+#include <string>
 
 namespace android {
 namespace wifi_system {

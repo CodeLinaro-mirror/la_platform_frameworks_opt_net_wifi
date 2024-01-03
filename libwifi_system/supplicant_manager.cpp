@@ -14,29 +14,90 @@
  * limitations under the License.
  */
 
-#include "wifi_system/supplicant_manager.h"
+/*
+ * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
 
+#include "wifi_system/supplicant_manager.h"
 #include <android-base/logging.h>
-#include <cutils/properties.h>
+#include <stdlib.h>
+
+#if 0
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
+
+#include <cutils/properties.h>
 
 // This ugliness is necessary to access internal implementation details
 // of the property subsystem.
 #define _REALLY_INCLUDE_SYS__SYSTEM_PROPERTIES_H_
 #include <sys/_system_properties.h>
 
+#endif
+
 namespace android {
 namespace wifi_system {
 namespace {
 
+#if 0
 const char kSupplicantInitProperty[] = "init.svc.wpa_supplicant";
+#endif
+
 const char kSupplicantServiceName[] = "wpa_supplicant";
+
+enum Supplicant_State {
+	STOPPED,
+	RUNNING
+};
+
+static Supplicant_State state = STOPPED;
 
 }  // namespace
 
+
+bool SupplicantManager::StartSupplicant() {
+    int ret;
+
+    if (state == RUNNING)
+        return true;
+
+    ret = system("wpa_supplicant -B");
+    if (!ret) {
+        LOG(DEBUG) << "Wpa_supplicant started successfully";
+        state = RUNNING;
+        return true;
+    }
+
+    return false;
+}
+
+bool SupplicantManager::StopSupplicant() {
+    int ret;
+
+    if (state == STOPPED)
+        return true;
+
+    ret = system("killall wpa_supplicant 1>/dev/null 2>/dev/null");
+    if (!ret) {
+        LOG(DEBUG) << "Wpa_supplicant stopped successfully";
+        state = STOPPED;
+        return true;
+    }
+
+    return false;
+}
+
+bool SupplicantManager::IsSupplicantRunning() {
+    return state == RUNNING;
+}
+
+#if 0
 bool SupplicantManager::StartSupplicant() {
   char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
   int count = 200; /* wait at most 20 seconds for completion */
@@ -117,6 +178,7 @@ bool SupplicantManager::IsSupplicantRunning() {
   }
   return false;  // Failed to read service status from init.
 }
+#endif
 
 }  // namespace wifi_system
 }  // namespace android
