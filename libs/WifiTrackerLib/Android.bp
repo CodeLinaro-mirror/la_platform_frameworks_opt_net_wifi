@@ -13,6 +13,9 @@ java_defaults {
         "WifiTrackerLibRes",
         "SettingsLibHelpUtils",
     ],
+    defaults: [
+        "framework-wifi-vendor-hide-access-defaults",
+    ],
 
     min_sdk_version: "S",
 }
@@ -29,7 +32,7 @@ android_library {
     srcs: ["sdk_src/**/NonSdkApiWrapper.java"],
     exclude_srcs: ["src/**/NonSdkApiWrapper.java"],
 
-    sdk_version: "system_current",
+    sdk_version: "core_platform",
 }
 
 // Define the resources as a separate library so that external apps may use them without needing to
