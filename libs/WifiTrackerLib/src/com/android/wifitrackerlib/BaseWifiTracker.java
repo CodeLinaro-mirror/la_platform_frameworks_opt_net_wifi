@@ -42,6 +42,7 @@ import android.net.wifi.sharedconnectivity.app.KnownNetworkConnectionStatus;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivityClientCallback;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivityManager;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivitySettingsState;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.telephony.SubscriptionManager;
@@ -116,6 +117,7 @@ public class BaseWifiTracker {
     private int mWifiState = WifiManager.WIFI_STATE_DISABLED;
 
     private boolean mIsInitialized = false;
+    private boolean mIsScanningDisabled = false;
 
     // Registered on the worker thread
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -151,7 +153,7 @@ public class BaseWifiTracker {
                     updateBandsInUseIfNeeded(); // AP clients changed
                 }
             } else if (WifiManager.RSSI_CHANGED_ACTION.equals(action)) {
-                handleRssiChangedAction();
+                handleRssiChangedAction(intent);
                 // CR/3194889: a corner case that Car/Settings UI doesn't refresh Wi-Fi list
                 // when scanning on boths bands are disabled. To fix this issue, fake a scan
                 // result event to refresh Wi-Fi list when RSSI level changes.
@@ -165,6 +167,7 @@ public class BaseWifiTracker {
     private final BaseWifiTracker.Scanner mScanner;
     private final BaseWifiTracker.Scanner mScanner2;
     private final BaseWifiTrackerCallback mListener;
+    private final @NonNull LifecycleObserver mLifecycleObserver;
 
     protected final WifiTrackerInjector mInjector;
     protected final Context mContext;
@@ -228,6 +231,20 @@ public class BaseWifiTracker {
                 @WorkerThread
                 public void onCapabilitiesChanged(@NonNull Network network,
                         @NonNull NetworkCapabilities networkCapabilities) {
+                    List<Network> underlyingNetworks =
+                            networkCapabilities.getUnderlyingNetworks();
+                    if (underlyingNetworks != null) {
+                        Network currentWifiNetwork = mWifiManager.getCurrentNetwork();
+                        if (underlyingNetworks.contains(currentWifiNetwork)) {
+                            // If the default network has an underlying Wi-Fi network (e.g. it's
+                            // a VPN), treat the Wi-Fi network as the default network.
+                            handleDefaultNetworkCapabilitiesChanged(currentWifiNetwork,
+                                    new NetworkCapabilities.Builder(networkCapabilities)
+                                            .setTransportInfo(mWifiManager.getConnectionInfo())
+                                            .build());
+                            return;
+                        }
+                    }
                     handleDefaultNetworkCapabilitiesChanged(network, networkCapabilities);
                 }
 
@@ -318,7 +335,12 @@ public class BaseWifiTracker {
     /**
      * Constructor for BaseWifiTracker.
      * @param injector Injector for commonly referenced objects.
-     * @param lifecycle Lifecycle this is tied to for lifecycle callbacks.
+     * @param lifecycle Lifecycle to register the internal LifecycleObserver with. Note that we
+     *                  register the LifecycleObserver inside the constructor, which may cause an
+     *                  NPE if the Lifecycle invokes onStart/onStop/onDestroyed within
+     *                  {@link Lifecycle#addObserver}. To avoid this, pass {@code null} here and
+     *                  register the LifecycleObserver from {@link #getLifecycleObserver()}
+     *                  instead.
      * @param context Context for registering broadcast receiver and for resource strings.
      * @param wifiManager Provides all Wi-Fi info.
      * @param connectivityManager Provides network info.
@@ -331,7 +353,7 @@ public class BaseWifiTracker {
     @SuppressWarnings("StaticAssignmentInConstructor")
     BaseWifiTracker(
             @NonNull WifiTrackerInjector injector,
-            @NonNull Lifecycle lifecycle, @NonNull Context context,
+            @Nullable Lifecycle lifecycle, @NonNull Context context,
             @NonNull WifiManager wifiManager,
             @NonNull ConnectivityManager connectivityManager,
             @NonNull Handler mainHandler,
@@ -343,7 +365,7 @@ public class BaseWifiTracker {
             String tag) {
         mInjector = injector;
         mActivityManager = context.getSystemService(ActivityManager.class);
-        lifecycle.addObserver(new LifecycleObserver() {
+        mLifecycleObserver = new LifecycleObserver() {
             @OnLifecycleEvent(Lifecycle.Event.ON_START)
             @MainThread
             public void onStart() {
@@ -361,13 +383,16 @@ public class BaseWifiTracker {
             public void onDestroy() {
                 BaseWifiTracker.this.onDestroy();
             }
-        });
+        };
+        if (lifecycle != null) {
+            lifecycle.addObserver(mLifecycleObserver);
+        }
         mContext = context;
         mWifiManager = wifiManager;
         mConnectivityManager = connectivityManager;
         mConnectivityDiagnosticsManager =
                 context.getSystemService(ConnectivityDiagnosticsManager.class);
-        if (mEnableSharedConnectivityFeature && BuildCompat.isAtLeastU()) {
+        if (mInjector.isSharedConnectivityFeatureEnabled() && BuildCompat.isAtLeastU()) {
             mSharedConnectivityManager = context.getSystemService(SharedConnectivityManager.class);
             mSharedConnectivityCallback = createSharedConnectivityCallback();
         }
@@ -438,12 +463,36 @@ public class BaseWifiTracker {
                     WifiScanner.WIFI_BAND_ALL, mDefaultScanIntervalMillis);
             mScanner2 = null;
         }
-        sVerboseLogging = mWifiManager.isVerboseLoggingEnabled();
+        if (mContext.getResources().getBoolean(
+                R.bool.wifitrackerlib_enable_verbose_logging_for_userdebug)
+                && Build.TYPE.equals("userdebug")) {
+            sVerboseLogging = true;
+        } else {
+            sVerboseLogging = mWifiManager.isVerboseLoggingEnabled();
+        }
         if (isVerboseLoggingEnabled() && mEnableScanSingleBand) {
             Log.v(mTag, "ScanInterval2G:" + mScanIntervalBand2GHzMillis
                     + ", ScanInterval5G:" + mScanIntervalBand5GHzMillis
                     + ", mAPmode:" + mAPMode);
         }
+    }
+
+    /**
+     * Disable the scanning mechanism permanently.
+     */
+    public void disableScanning() {
+        mIsScanningDisabled = true;
+        // This method indicates SystemUI usage, which shouldn't output verbose logs since it's
+        // always up.
+        sVerboseLogging = false;
+    }
+
+    /**
+     * Returns the LifecycleObserver to listen on the app's lifecycle state.
+     */
+    @AnyThread
+    public LifecycleObserver getLifecycleObserver() {
+        return mLifecycleObserver;
     }
 
     /**
@@ -638,10 +687,10 @@ public class BaseWifiTracker {
     }
 
     /**
-     * Handle receiving the WifiManager.RSSI_CHANGED_ACTION broadcast
+     * Handle receiving the WifiManager.NETWORK_STATE_CHANGED_ACTION broadcast
      */
     @WorkerThread
-    protected void handleRssiChangedAction() {
+    protected void handleRssiChangedAction(@NonNull Intent intent) {
         // Do nothing.
     }
 
@@ -884,7 +933,7 @@ public class BaseWifiTracker {
          * Scanning should only happen when Wi-Fi is enabled and the activity is started.
          */
         private boolean shouldScan() {
-            return mIsWifiEnabled && mIsStartedState;
+            return mIsWifiEnabled && mIsStartedState && !mIsScanningDisabled;
         }
 
         // If the scanning band has a critical connection, then schedule next scan with
