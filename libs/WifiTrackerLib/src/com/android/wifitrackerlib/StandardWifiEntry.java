@@ -251,6 +251,7 @@ public class StandardWifiEntry extends WifiEntry {
 
     @Override
     @Nullable
+    @SuppressLint("HardwareIds")
     public synchronized String getMacAddress() {
         if (mWifiInfo != null) {
             final String wifiInfoMac = mWifiInfo.getMacAddress();
@@ -284,6 +285,14 @@ public class StandardWifiEntry extends WifiEntry {
     @Override
     public synchronized boolean isSuggestion() {
         return mTargetWifiConfig != null && mTargetWifiConfig.fromWifiNetworkSuggestion;
+    }
+
+    @Override
+    public boolean needsWifiConfiguration() {
+        List<Integer> securityTypes = getSecurityTypes();
+        return !isSaved() && !isSuggestion()
+                && !securityTypes.contains(SECURITY_TYPE_OPEN)
+                && !securityTypes.contains(SECURITY_TYPE_OWE);
     }
 
     @Override
