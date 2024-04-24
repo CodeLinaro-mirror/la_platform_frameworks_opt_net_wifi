@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"조직에서 허용하지 않음"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="MODEL_NAME">%2$s</xliff:g>의 <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{휴대전화의 {NETWORK_NAME}}TABLET{태블릿의 {NETWORK_NAME}}COMPUTER{컴퓨터의 {NETWORK_NAME}}WATCH{시계의 {NETWORK_NAME}}VEHICLE{차량의 {NETWORK_NAME}}other{기기의 {NETWORK_NAME}}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"연결할 수 없습니다. 다시 연결해 보세요."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{연결할 수 없습니다. 휴대전화 설정을 확인한 후 다시 시도하세요.}TABLET{연결할 수 없습니다. 태블릿 설정을 확인한 후 다시 시도하세요.}COMPUTER{연결할 수 없습니다. 컴퓨터 설정을 확인한 후 다시 시도하세요.}WATCH{연결할 수 없습니다. 시계 설정을 확인한 후 다시 시도하세요.}VEHICLE{연결할 수 없습니다. 차량 설정을 확인한 후 다시 시도하세요.}other{연결할 수 없습니다. 기기 설정을 확인한 후 다시 시도하세요.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g>에서 이 연결을 허용하지 않습니다."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"연결할 수 없습니다. <xliff:g id="NETWORK_NAME">%1$s</xliff:g>에 문의하세요."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="DEVICE_NAME">%2$s</xliff:g>의 <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"연결 중…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>에서 사용 가능"</string>

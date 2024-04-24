@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Tashkilotingiz ruxsat bermagan"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="MODEL_NAME">%2$s</xliff:g> <xliff:g id="NETWORK_NAME">%1$s</xliff:g> yubordi"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{Telefoningizdan: {NETWORK_NAME}}TABLET{Planshetingizdan: {NETWORK_NAME}}COMPUTER{Kompyuteringizdan: {NETWORK_NAME}}WATCH{Soatingizdan: {NETWORK_NAME}}VEHICLE{Avtomobilingizdan: {NETWORK_NAME}}other{Qurilmangizdan: {NETWORK_NAME}}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"Ulanish imkonsiz. Qaytadan ulaning."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{Ulanish imkonsiz. Telefon sozlamalarini tekshiring va qayta urining.}TABLET{Ulanish imkonsiz. Planshet sozlamalarini tekshiring va qayta urining.}COMPUTER{Ulanish imkonsiz. Kompyuter sozlamalarini tekshiring va qayta urining.}WATCH{Ulanish imkonsiz. Soat sozlamalarini tekshiring va qayta urining.}VEHICLE{Ulanish imkonsiz. Transport sozlamalarini tekshiring va qayta urining.}other{Ulanish imkonsiz. Qurilma sozlamalarini tekshiring va qayta urining.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> bu ulanishni taqiqlagan"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"Ulanish imkonsiz. Yordam uchun <xliff:g id="NETWORK_NAME">%1$s</xliff:g> bilan bogʻlaning."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="DEVICE_NAME">%2$s</xliff:g> <xliff:g id="NETWORK_NAME">%1$s</xliff:g> yubordi"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"Ulanmoqda…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"Sotuvga chiqadi: <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
@@ -96,7 +92,7 @@
     <string name="wifitrackerlib_wifi_band_unknown" msgid="5576746583228374334">"Noaniq"</string>
     <string name="wifitrackerlib_wifi_band_24_ghz" msgid="5374362780653321244">"2,4 GGs"</string>
     <string name="wifitrackerlib_wifi_band_5_ghz" msgid="2179047349922091556">"5 GGs"</string>
-    <string name="wifitrackerlib_wifi_band_6_ghz" msgid="6532408050869498777">"6 GGs"</string>
+    <string name="wifitrackerlib_wifi_band_6_ghz" msgid="6532408050869498777">"6 GHz"</string>
     <string name="wifitrackerlib_multiband_separator" msgid="6838172120482590336">", "</string>
     <string name="wifitrackerlib_link_speed_mbps" msgid="5880214340478706112">"<xliff:g id="LINK_SPEED_MBPS">%1$d</xliff:g> Mbit/s"</string>
     <string name="wifitrackerlib_link_speed_on_band" msgid="2433114336144744962">"<xliff:g id="LINK_SPEED">%1$s</xliff:g> — <xliff:g id="BAND">%2$s</xliff:g>"</string>

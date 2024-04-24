@@ -16,7 +16,6 @@
 
 package com.android.wifitrackerlib;
 
-import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.os.Build.VERSION_CODES;
 
@@ -100,6 +99,26 @@ public class BaseWifiTracker {
     private boolean mIsInitialized = false;
     private boolean mIsScanningDisabled = false;
 
+    class WifiTrackerLifecycleObserver implements LifecycleObserver {
+        @OnLifecycleEvent(Lifecycle.Event.ON_START)
+        @MainThread
+        public void onStart() {
+            BaseWifiTracker.this.onStart();
+        }
+
+        @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+        @MainThread
+        public void onStop() {
+            BaseWifiTracker.this.onStop();
+        }
+
+        @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        @MainThread
+        public void onDestroy() {
+            BaseWifiTracker.this.onDestroy();
+        }
+    };
+
     // Registered on the worker thread
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -133,7 +152,8 @@ public class BaseWifiTracker {
     };
     private final BaseWifiTracker.Scanner mScanner;
     private final BaseWifiTrackerCallback mListener;
-    private final @NonNull LifecycleObserver mLifecycleObserver;
+    private final @NonNull LifecycleObserver mLifecycleObserver =
+            new WifiTrackerLifecycleObserver();
 
     protected final WifiTrackerInjector mInjector;
     protected final Context mContext;
@@ -155,7 +175,6 @@ public class BaseWifiTracker {
             .clearCapabilities()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .addTransportType(TRANSPORT_WIFI)
-            .addTransportType(TRANSPORT_CELLULAR) // For VCN-over-Wifi
             .build();
 
     private final ConnectivityManager.NetworkCallback mNetworkCallback =
@@ -325,25 +344,6 @@ public class BaseWifiTracker {
             String tag) {
         mInjector = injector;
         mActivityManager = context.getSystemService(ActivityManager.class);
-        mLifecycleObserver = new LifecycleObserver() {
-            @OnLifecycleEvent(Lifecycle.Event.ON_START)
-            @MainThread
-            public void onStart() {
-                BaseWifiTracker.this.onStart();
-            }
-
-            @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
-            @MainThread
-            public void onStop() {
-                BaseWifiTracker.this.onStop();
-            }
-
-            @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-            @MainThread
-            public void onDestroy() {
-                BaseWifiTracker.this.onDestroy();
-            }
-        };
         mContext = context;
         mWifiManager = wifiManager;
         mConnectivityManager = connectivityManager;
@@ -364,8 +364,8 @@ public class BaseWifiTracker {
                 maxScanAgeMillis + scanIntervalMillis);
         mScanner = new BaseWifiTracker.Scanner(workerHandler.getLooper());
 
-        if (lifecycle != null) { // Need to add after mScanner is initialized.
-            lifecycle.addObserver(mLifecycleObserver);
+        if (lifecycle != null) { // Need to add after constructor completes.
+            mMainHandler.post(() -> lifecycle.addObserver(mLifecycleObserver));
         }
     }
 
@@ -849,13 +849,13 @@ public class BaseWifiTracker {
         @WorkerThread
         private void scanLoop() {
             if (!shouldScan()) {
-                Log.wtf(mTag, "Scan loop called even though we shouldn't be scanning!"
+                Log.e(mTag, "Scan loop called even though we shouldn't be scanning!"
                         + " mIsWifiEnabled=" + mIsWifiEnabled
                         + " mIsStartedState=" + mIsStartedState);
                 return;
             }
             if (!isAppVisible()) {
-                Log.wtf(mTag, "Scan loop called even though app isn't visible anymore!"
+                Log.e(mTag, "Scan loop called even though app isn't visible anymore!"
                         + " mIsWifiEnabled=" + mIsWifiEnabled
                         + " mIsStartedState=" + mIsStartedState);
                 return;
