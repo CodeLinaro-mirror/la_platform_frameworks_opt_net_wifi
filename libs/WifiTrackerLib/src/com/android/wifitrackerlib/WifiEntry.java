@@ -1351,7 +1351,7 @@ public class WifiEntry {
     /**
      * Returns Wi-Fi standard of the connection/AP
      */
-    public int getWifiStandard() {
+    public synchronized int getWifiStandard() {
         if (getConnectedInfo() == null || mWifiInfo == null ||
                 getConnectedState() != CONNECTED_STATE_CONNECTED)
             return mWifiStandard;
