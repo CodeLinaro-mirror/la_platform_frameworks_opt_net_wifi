@@ -19,7 +19,7 @@
     <string name="wifitrackerlib_summary_separator" msgid="6613897475167609815">" / "</string>
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"ಇಂಟರ್ನೆಟ್ ಆ್ಯಕ್ಸೆಸ್‌ಗಾಗಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"ಸ್ವಯಂ ಕನೆಕ್ಟ್ ಆಫ್ ಆಗಿದೆ"</string>
-    <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"<xliff:g id="NAME">%1$s</xliff:g> ನಿಂದ ಉಳಿಸಲಾಗಿದೆ"</string>
+    <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"<xliff:g id="NAME">%1$s</xliff:g> ನಿಂದ ಸೇವ್ ಮಾಡಲಾಗಿದೆ"</string>
     <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"ಯಾವುದೇ ಇಂಟರ್ನೆಟ್ ಪ್ರವೇಶವಿಲ್ಲ"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"ದೃಢೀಕರಣದ ಸಮಸ್ಯೆ"</string>
@@ -35,7 +35,7 @@
     <string name="wifitrackerlib_wifi_network_not_found" msgid="1308764769892463388">"ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಂತರ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ."</string>
     <string name="wifitrackerlib_wifi_disconnected" msgid="3320414360982942679">"ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಲಾಗಿದೆ"</string>
     <string name="wifitrackerlib_wifi_remembered" msgid="2406091442008343041">"ಸೇವ್‌ ಮಾಡಲಾಗಿದೆ"</string>
-    <string name="wifitrackerlib_wifi_metered_label" msgid="8818508951778620385">"ಮೀಟರ್ ಮಾಡಲಾಗಿದೆ"</string>
+    <string name="wifitrackerlib_wifi_metered_label" msgid="8818508951778620385">"ಮೀಟರ್ಡ್ ನೆಟ್‌ವರ್ಕ್"</string>
     <string name="wifitrackerlib_wifi_unmetered_label" msgid="1902150402929678469">"ಮೀಟರ್ ಮಾಡಲಾಗಿಲ್ಲ"</string>
     <string name="wifitrackerlib_connected_via_app" msgid="7823921840931347560">"<xliff:g id="NAME">%1$s</xliff:g> ಆ್ಯಪ್ ಮೂಲಕ ಕನೆಕ್ಟ್ ಮಾಡಲಾಗಿದೆ"</string>
     <string name="wifitrackerlib_available_via_app" msgid="8556844256194837469">"<xliff:g id="NAME">%1$s</xliff:g> ಮೂಲಕ ಲಭ್ಯವಿದೆ"</string>
@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"ನಿಮ್ಮ ಸಂಸ್ಥೆಯಿಂದ ಅನುಮತಿಸಲಾಗಿಲ್ಲ"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="MODEL_NAME">%2$s</xliff:g> ನಿಂದ <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ {NETWORK_NAME}}TABLET{ನಿಮ್ಮ ಟ್ಯಾಬ್ಲೆಟ್‌ನಿಂದ {NETWORK_NAME}}COMPUTER{ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಿಂದ {NETWORK_NAME}}WATCH{ನಿಮ್ಮ ವಾಚ್‌ನಿಂದ {NETWORK_NAME}}VEHICLE{ನಿಮ್ಮ ವಾಹನದಿಂದ {NETWORK_NAME}}other{ನಿಮ್ಮ ಸಾಧನದಿಂದ {NETWORK_NAME}}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಪುನಃ ಕನೆಕ್ಟ್ ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಫೋನ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}TABLET{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಟ್ಯಾಬ್ಲೆಟ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}COMPUTER{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಕಂಪ್ಯೂಟರ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}WATCH{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ವಾಚ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}VEHICLE{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ವಾಹನದ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}other{ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಸಾಧನದ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಹಾಗೂ ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> ಈ ಕನೆಕ್ಷನ್‌ಗೆ ಅವಕಾಶ ನೀಡುವುದಿಲ್ಲ"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"ಕನೆಕ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಸಹಾಯಕ್ಕಾಗಿ <xliff:g id="NETWORK_NAME">%1$s</xliff:g> ಅನ್ನು ಸಂಪರ್ಕಿಸಿ."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="DEVICE_NAME">%2$s</xliff:g> ನಿಂದ <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"ಕನೆಕ್ಟ್ ಆಗುತ್ತಿದೆ…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> ನಿಂದ ಲಭ್ಯವಿದೆ"</string>

@@ -23,7 +23,7 @@
     <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"Haiwezi kuunganisha kiotomatiki"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"Hakuna muunganisho wa intaneti"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"Tatizo la uthibitishaji"</string>
-    <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"Angalia nenosiri na ujaribu tena"</string>
+    <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"Angalia nenosiri kisha ujaribu tena"</string>
     <string name="wifitrackerlib_wifi_disabled_network_failure" msgid="3046956554224277166">"Imeshindwa kuweka mipangilio ya IP"</string>
     <string name="wifitrackerlib_wifi_disabled_transition_disable_indication" msgid="6416221593061166867">"Haipatikani kwa mipangilio yako ya sasa ya usalama"</string>
     <string name="wifitrackerlib_wifi_disabled_generic" msgid="4278806060337007814">"Umezimwa"</string>
@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Shirika lako haliruhusu"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> kutoka kwenye <xliff:g id="MODEL_NAME">%2$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{{NETWORK_NAME} kutoka kwenye simu yako}TABLET{{NETWORK_NAME} kutoka kwenye kishikwambi chako}COMPUTER{{NETWORK_NAME} kutoka kwenye kompyuta yako}WATCH{{NETWORK_NAME} kutoka kwenye saa yako}VEHICLE{{NETWORK_NAME} kutoka kwenye gari lako}other{{NETWORK_NAME} kutoka kwenye kifaa chako}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"Imeshindwa kuunganisha. Jaribu kuunganisha tena."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{Imeshindwa kuunganisha. Angalia mipangilio ya simu kisha ujaribu tena.}TABLET{Imeshindwa kuunganisha. Angalia mipangilio ya kishikwambi kisha ujaribu tena.}COMPUTER{Imeshindwa kuunganisha. Angalia mipangilio ya kompyuta kisha ujaribu tena.}WATCH{Imeshindwa kuunganisha. Angalia mipangilio ya saa kisha ujaribu tena.}VEHICLE{Imeshindwa kuunganisha. Angalia mipangilio ya gari kisha ujaribu tena.}other{Imeshindwa kuunganisha. Angalia mipangilio ya kifaa kisha ujaribu tena.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> hairuhusu muunganisho huu"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"Imeshindwa kuunganisha. Wasiliana na <xliff:g id="NETWORK_NAME">%1$s</xliff:g> ili upate usaidizi."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> kutoka kwenye <xliff:g id="DEVICE_NAME">%2$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"Inaunganisha…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"Unapatikana kwenye <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>

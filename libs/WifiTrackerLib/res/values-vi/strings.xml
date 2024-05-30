@@ -18,7 +18,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="wifitrackerlib_summary_separator" msgid="6613897475167609815">" / "</string>
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"Đang kiểm tra kết nối Internet..."</string>
-    <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"Tính năng tự động kết nối đang tắt"</string>
+    <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"Tính năng tự động kết nối đã bị tắt"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"Do ứng dụng <xliff:g id="NAME">%1$s</xliff:g> lưu"</string>
     <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"Sẽ không tự động kết nối"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"Không có kết nối Internet"</string>
@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Không được tổ chức của bạn cho phép"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> trên <xliff:g id="MODEL_NAME">%2$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{{NETWORK_NAME} trên điện thoại của bạn}TABLET{{NETWORK_NAME} trên máy tính bảng của bạn}COMPUTER{{NETWORK_NAME} trên máy tính của bạn}WATCH{{NETWORK_NAME} trên đồng hồ của bạn}VEHICLE{{NETWORK_NAME} trên xe của bạn}other{{NETWORK_NAME} trên thiết bị của bạn}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"Không kết nối được. Hãy thử kết nối lại."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{Không kết nối được. Hãy kiểm tra chế độ cài đặt của điện thoại rồi thử lại.}TABLET{Không kết nối được. Hãy kiểm tra chế độ cài đặt của máy tính bảng rồi thử lại.}COMPUTER{Không kết nối được. Hãy kiểm tra chế độ cài đặt của máy tính rồi thử lại.}WATCH{Không kết nối được. Hãy kiểm tra chế độ cài đặt của đồng hồ rồi thử lại.}VEHICLE{Không kết nối được. Hãy kiểm tra chế độ cài đặt của xe rồi thử lại.}other{Không kết nối được. Hãy kiểm tra chế độ cài đặt của thiết bị rồi thử lại.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> không cho phép kết nối này"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"Không kết nối được. Hãy liên hệ với <xliff:g id="NETWORK_NAME">%1$s</xliff:g> để được trợ giúp."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> trên <xliff:g id="DEVICE_NAME">%2$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"Đang kết nối…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"Nguồn Internet: <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
