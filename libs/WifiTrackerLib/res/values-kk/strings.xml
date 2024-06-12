@@ -46,14 +46,10 @@
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Ұйымыңыз рұқсат етпеген"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="MODEL_NAME">%2$s</xliff:g> ұсынған <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{Телефондағы {NETWORK_NAME}}TABLET{Планшеттегі {NETWORK_NAME}}COMPUTER{Компьютердегі {NETWORK_NAME}}WATCH{Сағаттағы {NETWORK_NAME}}VEHICLE{Көліктегі {NETWORK_NAME}}other{Құрылғыдағы {NETWORK_NAME}}}"</string>
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_generic (2339836723160908882) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_settings (6928234716406336668) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_block (359780026027619177) -->
-    <skip />
-    <!-- no translation found for wifitrackerlib_hotspot_network_summary_error_carrier_incomplete (3407132390461094984) -->
-    <skip />
+    <string name="wifitrackerlib_hotspot_network_summary_error_generic" msgid="2339836723160908882">"Қосылу мүмкін емес. Қайта қосылып көріңіз."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_settings" msgid="6928234716406336668">"{DEVICE_TYPE,select, PHONE{Қосылу мүмкін емес. Телефон параметрлерін тексеріп, әрекетті қайталап көріңіз.}TABLET{Қосылу мүмкін емес. Планшет параметрлерін тексеріп, әрекетті қайталап көріңіз.}COMPUTER{Қосылу мүмкін емес. Компьютер параметрлерін тексеріп, әрекетті қайталап көріңіз.}WATCH{Қосылу мүмкін емес. Сағат параметрлерін тексеріп, әрекетті қайталап көріңіз.}VEHICLE{Қосылу мүмкін емес. Көлік параметрлерін тексеріп, әрекетті қайталап көріңіз.}other{Қосылу мүмкін емес. Құрылғы параметрлерін тексеріп, әрекетті қайталап көріңіз.}}"</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_block" msgid="359780026027619177">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> бұл қосылымды пайдалануға рұқсат етпейді."</string>
+    <string name="wifitrackerlib_hotspot_network_summary_error_carrier_incomplete" msgid="3407132390461094984">"Қосылу мүмкін емес. Анықтама алу үшін <xliff:g id="NETWORK_NAME">%1$s</xliff:g> операторына хабарласыңыз."</string>
     <string name="wifitrackerlib_hotspot_network_alternate" msgid="4966814473758893807">"<xliff:g id="DEVICE_NAME">%2$s</xliff:g> ұсынған <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_hotspot_network_connecting" msgid="2072252282318270780">"Қосылып жатыр…"</string>
     <string name="wifitrackerlib_known_network_summary" msgid="6035425130009353268">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> құрылғысынан қолжетімді."</string>
