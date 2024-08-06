@@ -43,6 +43,7 @@ soong_config_module_type {
         "cflags",
         "defaults",
         "shared_libs",
+        "srcs",
         "static_libs",
         "whole_static_libs",
     ],
@@ -62,6 +63,7 @@ soong_config_string_variable {
         "rtl",
         "slsi",
         "wlan0",
+        "unisoc",
     ],
 }
 
@@ -115,7 +117,7 @@ wifi_cc_defaults {
         },
         multiple_vendor_hals: {
             cflags: ["-DWIFI_MULTIPLE_VENDOR_HALS"],
-        }
+        },
     },
 }
 
@@ -137,7 +139,7 @@ cc_library_static {
     vendor: true,
     defaults: ["libwifi_hal_cflags_defaults"],
     srcs: ["wifi_hal_fallback.cpp"],
-    header_libs: ["wifi_legacy_headers"]
+    header_libs: ["wifi_legacy_headers"],
 }
 
 wifi_cc_defaults {
@@ -181,6 +183,9 @@ wifi_cc_defaults {
             },
             slsi: {
                 whole_static_libs: ["libwifi-hal-slsi"],
+            },
+            unisoc: {
+                whole_static_libs: ["libwifi-hal-uni"],
             },
             conditions_default: {
                 whole_static_libs: ["libwifi-hal-fallback"],
