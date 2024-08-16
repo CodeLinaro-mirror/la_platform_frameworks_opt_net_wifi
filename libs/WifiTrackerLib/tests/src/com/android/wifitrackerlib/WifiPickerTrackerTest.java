@@ -196,8 +196,6 @@ public class WifiPickerTrackerTest {
                         return TransportInfo.super.makeCopy(redactions);
                     }
                 });
-        when(mMockVcnNetworkCapabilities.getUnderlyingNetworks()).thenReturn(
-                Arrays.asList(mMockNetwork));
         // A real NetworkCapabilities is needed here in order to create a copy (with location info)
         // using the NetworkCapabilities constructor in handleOnStart.
         NetworkCapabilities realNetCaps = new NetworkCapabilities.Builder()
@@ -1045,6 +1043,14 @@ public class WifiPickerTrackerTest {
         mDefaultNetworkCallbackCaptor.getValue().onCapabilitiesChanged(Mockito.mock(Network.class),
                 new NetworkCapabilities.Builder()
                         .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                        .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR).build());
+        assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
+
+        // Restricted Cell is default should not trigger low quality, since the default network is
+        // determined by PANS policy, and this is intentional.
+        mDefaultNetworkCallbackCaptor.getValue().onCapabilitiesChanged(Mockito.mock(Network.class),
+                new NetworkCapabilities.Builder()
+                        .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
                         .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR).build());
         assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
 
@@ -2239,17 +2245,21 @@ public class WifiPickerTrackerTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mMockContext, intent);
         verify(mMockConnectivityManager).registerNetworkCallback(
                 any(), mNetworkCallbackCaptor.capture(), any());
-        verify(mMockConnectivityManager).registerDefaultNetworkCallback(
+        verify(mMockConnectivityManager, atLeast(0)).registerSystemDefaultNetworkCallback(
+                mDefaultNetworkCallbackCaptor.capture(), any());
+        verify(mMockConnectivityManager, atLeast(0)).registerDefaultNetworkCallback(
                 mDefaultNetworkCallbackCaptor.capture(), any());
 
         MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
         try {
-            // Connect to Wifi network
+            // Connect to VCN-over-Wifi network
             when(mMockWifiInfo.isCarrierMerged()).thenReturn(true);
             when(mMockWifiInfo.getSubscriptionId()).thenReturn(subId);
+            doReturn(mMockWifiInfo).when(() ->
+                    NonSdkApiWrapper.getWifiInfoIfVcn(mMockVcnNetworkCapabilities));
             doReturn(true).when(() -> NonSdkApiWrapper.isPrimary(mMockWifiInfo));
             mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
-                    mMockNetwork, mMockNetworkCapabilities);
+                    mMockNetwork, mMockVcnNetworkCapabilities);
             MergedCarrierEntry mergedCarrierEntry = wifiPickerTracker.getMergedCarrierEntry();
             assertThat(mergedCarrierEntry.getConnectedState())
                     .isEqualTo(CONNECTED_STATE_CONNECTED);
