@@ -2,6 +2,8 @@ LIBNAME=libwifi-system-iface.so.0
 
 CXXFLAGS += -c -std=c++17
 CPPFLAGS += -Iinclude
+CPPFLAGS += -DENABLE_LOG
+LDFLAGS += -lqti_log_util
 LDFLAGS += -shared -lbase -Wl,-soname,$(LIBNAME)
 
 #CPPFLAGS += -Wall -Werror

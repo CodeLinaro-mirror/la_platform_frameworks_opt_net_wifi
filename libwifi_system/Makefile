@@ -2,7 +2,8 @@ LIBNAME=libwifi-system.so.0
 
 CXXFLAGS += -c
 CPPFLAGS += -Iinclude
-LDFLAGS += -lbase
+CPPFLAGS += -DENABLE_LOG
+LDFLAGS += -lqti_log_util
 #-lcrypto -lcutils
 LDFLAGS += -shared -Wl,-soname,$(LIBNAME)
 

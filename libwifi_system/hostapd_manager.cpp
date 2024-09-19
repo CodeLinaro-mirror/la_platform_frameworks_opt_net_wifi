@@ -25,7 +25,7 @@
 
 #include "wifi_system/hostapd_manager.h"
 
-#include <android-base/logging.h>
+#include <rpc/util/log_common.h>
 //#include <cutils/properties.h>
 
 namespace android {
@@ -41,12 +41,12 @@ bool HostapdManager::StartHostapd() {
 #endif
 
   if (!system("hostapd -B"))
-      LOG(DEBUG) << "SoftAP started successfully";
+      ALOGD("SoftAP started successfully");
   return true;
 }
 
 bool HostapdManager::StopHostapd() {
-  LOG(DEBUG) << "Stopping the SoftAP service...";
+  ALOGD("Stopping the SoftAP service...");
 
 #if 0
   if (property_set("ctl.stop", kHostapdServiceName) < 0) {
@@ -56,7 +56,7 @@ bool HostapdManager::StopHostapd() {
 #endif
 
   if (!system("killall hostapd 1>/dev/null 2>/dev/null"))
-      LOG(DEBUG) << "SoftAP stopped successfully";
+      ALOGD("SoftAP stopped successfully");
   return true;
 }
 }  // namespace wifi_system

@@ -38,7 +38,7 @@
 #include <linux/if.h>
 #include <linux/sockios.h>
 
-#include <android-base/logging.h>
+#include <rpc/util/log_common.h>
 #include <android-base/unique_fd.h>
 
 #include <cutils/memory.h>
@@ -57,13 +57,12 @@ bool GetIfState(const char* if_name, int sock, struct ifreq* ifr) {
   memset(ifr, 0, sizeof(*ifr));
   if (strlcpy(ifr->ifr_name, if_name, sizeof(ifr->ifr_name)) >=
       sizeof(ifr->ifr_name)) {
-    LOG(ERROR) << "Interface name is too long: " << if_name;
+    ALOGE("Interface name is too long: %s", if_name);
     return false;
   }
 
   if (TEMP_FAILURE_RETRY(ioctl(sock, SIOCGIFFLAGS, ifr)) != 0) {
-    LOG(ERROR) << "Could not read interface state for " << if_name
-               << " (" << strerror(errno) << ")";
+    ALOGE("Could not read interface state for %s (%s)", if_name, strerror(errno));
     return false;
   }
 
@@ -75,8 +74,7 @@ bool GetIfState(const char* if_name, int sock, struct ifreq* ifr) {
 bool InterfaceTool::GetUpState(const char* if_name) {
   base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
   if (sock.get() < 0) {
-    LOG(ERROR) << "Failed to open socket to set up/down state ("
-               << strerror(errno) << ")";
+    ALOGE("Failed to open socket to get up/down state (%s)", strerror(errno));
     return false;
   }
 
@@ -91,8 +89,7 @@ bool InterfaceTool::GetUpState(const char* if_name) {
 bool InterfaceTool::SetUpState(const char* if_name, bool request_up) {
   base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
   if (sock.get() < 0) {
-    LOG(ERROR) << "Failed to open socket to set up/down state ("
-               << strerror(errno) << ")";
+    ALOGE("Failed to open socket to set up/down state (%s)", strerror(errno));
     return false;
   }
 
@@ -113,8 +110,7 @@ bool InterfaceTool::SetUpState(const char* if_name, bool request_up) {
   }
 
   if (TEMP_FAILURE_RETRY(ioctl(sock.get(), SIOCSIFFLAGS, &ifr)) != 0) {
-    LOG(ERROR) << "Could not set interface flags for " << if_name
-               << " (" << strerror(errno) << ")";
+    ALOGE("Could not set interface flags for %s (%s)", if_name, strerror(errno));
     return false;
   }
 
@@ -133,8 +129,7 @@ bool InterfaceTool::SetMacAddress(const char* if_name,
 
   base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
   if (sock.get() < 0) {
-    LOG(ERROR) << "Failed to open socket to set MAC address ("
-               << strerror(errno) << ")";
+    ALOGE("Failed to open socket to set MAC address (%s)", strerror(errno));
     return false;
   }
 
@@ -146,8 +141,7 @@ bool InterfaceTool::SetMacAddress(const char* if_name,
   ifr.ifr_hwaddr.sa_family = ARPHRD_ETHER;
   memcpy(ifr.ifr_hwaddr.sa_data, new_address.data(), new_address.size());
   if (TEMP_FAILURE_RETRY(ioctl(sock.get(), SIOCSIFHWADDR, &ifr)) != 0) {
-    LOG(ERROR) << "Could not set interface MAC address for " << if_name
-               << " (" << strerror(errno) << ")";
+    ALOGE("Could not set interface MAC address for %s (%s)", if_name, strerror(errno));
     return false;
   }
 
@@ -166,8 +160,7 @@ std::array<uint8_t, ETH_ALEN> InterfaceTool::GetFactoryMacAddress(const char* if
 
   base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
   if (sock.get() < 0) {
-    LOG(ERROR) << "Failed to open socket to get factory MAC address ("
-               << strerror(errno) << ")";
+    ALOGE("Failed to open socket to get factory MAC address (%s)", strerror(errno));
     return paddr;
   }
 
@@ -180,8 +173,7 @@ std::array<uint8_t, ETH_ALEN> InterfaceTool::GetFactoryMacAddress(const char* if
   ifr.ifr_data = (char *)epaddr;
 
   if (TEMP_FAILURE_RETRY(ioctl(sock.get(), SIOCETHTOOL, &ifr)) != 0) {
-    LOG(ERROR) << "Could not get factory address MAC for " << if_name
-               << " (" << strerror(errno) << ")";
+    ALOGE("Could not get factory address MAC for %s (%s)", if_name, strerror(errno));
   } else if (epaddr->size == ETH_ALEN) {
     memcpy(paddr.data(), epaddr->data, ETH_ALEN);
   }
@@ -192,8 +184,7 @@ bool InterfaceTool::createBridge(const std::string& br_name) {
     base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
 
     if (TEMP_FAILURE_RETRY(ioctl(sock, SIOCBRADDBR, br_name.c_str())) != 0) {
-        LOG(ERROR) << "Could not add bridge " << br_name.c_str()
-                   << " (" << strerror(errno) << ")";
+        ALOGE("Could not add bridge %s (%s)", br_name.c_str(), strerror(errno));
         return false;
     }
 
@@ -204,8 +195,7 @@ bool InterfaceTool::deleteBridge(const std::string& br_name) {
     base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
 
     if (TEMP_FAILURE_RETRY(ioctl(sock, SIOCBRDELBR, br_name.c_str())) != 0) {
-        LOG(ERROR) << "Could not remove bridge " << br_name.c_str()
-                   << " (" << strerror(errno) << ")";
+        ALOGE("Could not remove bridge %s (%s)", br_name.c_str(), strerror(errno));
         return false;
     }
     return true;
@@ -217,16 +207,14 @@ bool InterfaceTool::addIfaceToBridge(const std::string& br_name, const std::stri
 
     ifr.ifr_ifindex = if_nametoindex(if_name.c_str());
     if (ifr.ifr_ifindex == 0) {
-        LOG(ERROR) << "Interface is not exist: " << if_name.c_str();
+        ALOGE("Interface is not exist: %s", if_name.c_str());
         return false;
     }
     strlcpy(ifr.ifr_name, br_name.c_str(), IFNAMSIZ);
 
     base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
     if (TEMP_FAILURE_RETRY(ioctl(sock, SIOCBRADDIF, &ifr)) != 0) {
-        LOG(ERROR) << "Could not add interface " << if_name.c_str()
-                   << " into bridge " << ifr.ifr_name
-                   << " (" << strerror(errno) << ")";
+        ALOGE("Could not add interface %s into bridge %s (%s)", if_name.c_str(), ifr.ifr_name, strerror(errno));
         return false;
     }
     return true;
@@ -238,16 +226,14 @@ bool InterfaceTool::removeIfaceFromBridge(const std::string& br_name, const std:
 
     ifr.ifr_ifindex = if_nametoindex(if_name.c_str());
     if (ifr.ifr_ifindex == 0) {
-        LOG(ERROR) << "Interface is not exist: " << if_name.c_str();
+        ALOGE("Interface is not exist: %s", if_name.c_str());
         return false;
     }
     strlcpy(ifr.ifr_name, br_name.c_str(), IFNAMSIZ);
 
     base::unique_fd sock(socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
     if (TEMP_FAILURE_RETRY(ioctl(sock, SIOCBRDELIF, &ifr)) != 0) {
-        LOG(ERROR) << "Could not remove interface " << if_name.c_str()
-                   << " from bridge " << ifr.ifr_name
-                   << " (" << strerror(errno) << ")";
+        ALOGE("Could not remove interface %s from bridge %s (%s)", if_name.c_str(), ifr.ifr_name, strerror(errno));
         return false;
     }
 

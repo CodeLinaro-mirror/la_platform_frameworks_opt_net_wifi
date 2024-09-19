@@ -22,7 +22,7 @@
  */
 
 #include "wifi_system/supplicant_manager.h"
-#include <android-base/logging.h>
+#include <rpc/util/log_common.h>
 #include <stdlib.h>
 
 #if 0
@@ -69,7 +69,7 @@ bool SupplicantManager::StartSupplicant() {
 
     ret = system("wpa_supplicant -B");
     if (!ret) {
-        LOG(DEBUG) << "Wpa_supplicant started successfully";
+        ALOGD("Wpa_supplicant started successfully");
         state = RUNNING;
         return true;
     }
@@ -85,7 +85,7 @@ bool SupplicantManager::StopSupplicant() {
 
     ret = system("killall wpa_supplicant 1>/dev/null 2>/dev/null");
     if (!ret) {
-        LOG(DEBUG) << "Wpa_supplicant stopped successfully";
+        ALOGD("Wpa_supplicant stopped successfully");
         state = STOPPED;
         return true;
     }

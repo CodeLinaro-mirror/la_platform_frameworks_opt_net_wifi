@@ -29,7 +29,9 @@
 #include <time.h>
 #include <string.h>
 
-#include <android-base/logging.h>
+#include <rpc/util/log_common.h>
+#include  <cerrno>
+//#include <android-base/logging.h>
 #include <cutils/misc.h>
 //#include <cutils/properties.h>
 #include <sys/syscall.h>
@@ -81,7 +83,7 @@ static int insmod(const char *filename, const char *args) {
 
   fd = TEMP_FAILURE_RETRY(open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
   if (fd < 0) {
-    PLOG(ERROR) << "Failed to open " << filename;
+    ALOGE("Failed to open %s", filename);
     return -1;
   }
 
@@ -89,7 +91,7 @@ static int insmod(const char *filename, const char *args) {
 
   close(fd);
   if (ret < 0) {
-    PLOG(ERROR) << "finit_module return: " << ret;
+    ALOGE("finit_module return: %d", ret);
   }
 
   return ret;
@@ -108,7 +110,7 @@ static int rmmod(const char *modname) {
   }
 
   if (ret != 0)
-    PLOG(ERROR) << "Unable to unload driver module '" << modname << "'";
+    ALOGE("Unable to unload driver module '%s'", modname);
   return ret;
 }
 #endif
@@ -130,18 +132,17 @@ int wifi_change_driver_state(const char *state) {
     nanosleep(&req, (struct timespec *)NULL);
   } while (--count > 0);
   if (count == 0) {
-    PLOG(ERROR) << "Failed to access driver state control param "
-                << strerror(errno) << ", " << errno;
+    ALOGE("Failed to access driver state control param %s, %d", strerror(errno), errno);
     return -1;
   }
   fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_STATE_CTRL_PARAM, O_WRONLY));
   if (fd < 0) {
-    PLOG(ERROR) << "Failed to open driver state control param";
+    ALOGE("Failed to open driver state control param");
     return -1;
   }
   len = strlen(state) + 1;
   if (TEMP_FAILURE_RETRY(write(fd, state, len)) != len) {
-    PLOG(ERROR) << "Failed to write driver state control param";
+    ALOGE("Failed to write driver state control param");
     ret = -1;
   }
   close(fd);
@@ -170,7 +171,7 @@ int is_wifi_driver_loaded() {
    * crash.
    */
   if ((proc = fopen(MODULE_FILE, "r")) == NULL) {
-    PLOG(ERROR) << "Could not open " << MODULE_FILE;
+    ALOGE("Could not open %s", MODULE_FILE);
     is_driver_loaded = false;
     return 0;
   }
@@ -196,20 +197,20 @@ int wifi_load_driver() {
       return -1;
     is_driver_loaded = true;
 #else
-    PLOG(ERROR) << "No driver loaded.";
+    ALOGE("No driver loaded.");
     return -1;
 #endif
   }
 
 #ifdef WIFI_DRIVER_STATE_CTRL_PARAM
   if (wifi_change_driver_state(WIFI_DRIVER_STATE_ON) < 0) {
-    PLOG(ERROR) << "Driver unloading, err='fail to change driver state'";
+    ALOGE("Driver unloading, err='fail to change driver state'");
 #ifdef WIFI_DRIVER_MODULE_PATH
     if (rmmod(DRIVER_MODULE_NAME) == 0) {
-      PLOG(INFO) << "Driver unloaded";
+      ALOGI("Driver unloaded");
       is_driver_loaded = false;
     } else {
-      PLOG(ERROR) << "Driver unload failed!";
+      ALOGE("Driver unload failed!");
     }
 #endif
     return -1;
@@ -227,7 +228,7 @@ int wifi_unload_driver() {
 
 #if defined(WIFI_DRIVER_STATE_CTRL_PARAM)
   if (wifi_change_driver_state(WIFI_DRIVER_STATE_OFF) < 0) {
-    PLOG(ERROR) << "Change Driver state off fail";
+    ALOGE("Change Driver state off fail");
     return -1;
   }
 #elif defined(WIFI_DRIVER_MODULE_PATH)
@@ -270,12 +271,12 @@ int wifi_change_fw_path(const char *fwpath) {
   if (!fwpath) return ret;
   fd = TEMP_FAILURE_RETRY(open(WIFI_DRIVER_FW_PATH_PARAM, O_WRONLY));
   if (fd < 0) {
-    PLOG(ERROR) << "Failed to open wlan fw path param";
+    ALOGE("Failed to open wlan fw path param");
     return -1;
   }
   len = strlen(fwpath) + 1;
   if (TEMP_FAILURE_RETRY(write(fd, fwpath, len)) != len) {
-    PLOG(ERROR) << "Failed to write wlan fw path param";
+    ALOGE("Failed to write wlan fw path param");
     ret = -1;
   }
   close(fd);

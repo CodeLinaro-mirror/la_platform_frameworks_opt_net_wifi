@@ -20,8 +20,6 @@
 
 #include "wifi_hal/driver_tool.h"
 
-#include <android-base/logging.h>
-
 #include "hardware_legacy/wifi.h"
 
 namespace android {
