@@ -1101,4 +1101,142 @@ public class HotspotNetworkEntryTest {
 
         assertThat(entry.getSummary()).isNotEqualTo("Can't connect. Try connecting again.");
     }
+
+    @Test
+    public void testGetSummary_connectionCanceled_resetsConnectingString() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(true).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkUnknownStatusResetsConnectingStateEnabled());
+            entry.onConnectionStatusChanged(
+                    HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+            mTestLooper.dispatchAll();
+            assertThat(entry.getSummary()).isEqualTo("Connecting…");
+
+            entry.onConnectionStatusChanged(
+                    HotspotNetworkConnectionStatus.CONNECTION_STATUS_UNKNOWN);
+            mTestLooper.dispatchAll();
+
+            assertThat(entry.getSummary()).isNotEqualTo("Connecting…");
+        } finally {
+            session.finishMocking();
+        }
+    }
+
+    @Test
+    public void testGetSummary_concise_enabling_detailsPageFlagFalse_returnsConnectingString() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        entry.onConnectionStatusChanged(
+                HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+        mTestLooper.dispatchAll();
+
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(false).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled());
+            assertThat(entry.getSummary(true)).isEqualTo("Connecting…");
+        } finally {
+            session.finishMocking();
+        }
+    }
+
+    @Test
+    public void testGetSummary_concise_enabling_detailsPageFlagTrue_returnsSummaryString() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        entry.onConnectionStatusChanged(
+                HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+        mTestLooper.dispatchAll();
+
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(true).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled());
+            assertThat(entry.getSummary(true)).isEqualTo("Google Fi from your phone");
+        } finally {
+            session.finishMocking();
+        }
+    }
+
+    @Test
+    public void testGetSummary_notConcise_enabling_detailsPageFlagTrue_returnsConnectingString() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        entry.onConnectionStatusChanged(
+                HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+        mTestLooper.dispatchAll();
+
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(true).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled());
+            assertThat(entry.getSummary(false)).isEqualTo("Connecting…");
+        } finally {
+            session.finishMocking();
+        }
+    }
+
+    @Test
+    public void testGetConnectedState_enabling_detailsPageFlagFalse_returnsDisconnected() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        entry.onConnectionStatusChanged(
+                HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+        mTestLooper.dispatchAll();
+
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(false).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled());
+            assertThat(entry.getConnectedState())
+                    .isEqualTo(HotspotNetworkEntry.CONNECTED_STATE_DISCONNECTED);
+        } finally {
+            session.finishMocking();
+        }
+    }
+
+    @Test
+    public void testGetConnectedState_enabling_detailsPageFlagTrue_returnsConnecting() {
+        final HotspotNetworkEntry entry = new HotspotNetworkEntry(
+                mMockInjector, mMockContext, mTestHandler,
+                mMockWifiManager, mMockSharedConnectivityManager, TEST_HOTSPOT_NETWORK_DATA);
+
+        entry.setListener(mMockListener);
+        entry.connect(mMockConnectCallback);
+        entry.onConnectionStatusChanged(
+                HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT);
+        mTestLooper.dispatchAll();
+
+        MockitoSession session = mockitoSession().spyStatic(NonSdkApiWrapper.class).startMocking();
+        try {
+            doReturn(true).when(() ->
+                    NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled());
+            assertThat(entry.getConnectedState())
+                    .isEqualTo(HotspotNetworkEntry.CONNECTED_STATE_CONNECTING);
+        } finally {
+            session.finishMocking();
+        }
+    }
 }
