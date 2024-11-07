@@ -204,6 +204,8 @@ public class BaseWifiTracker {
     private final int mAPMode; // IFACE_IP_MODE_TETHERED or IFACE_IP_MODE_LOCAL_ONLY
     private int mBandsInUse; // Indicate if specific band have a high priorty connection
 
+    protected static final long MAX_SCAN_AGE_FOR_FAILED_SCAN_MS = 5 * 60 * 1000;
+
     @Nullable protected SharedConnectivityManager mSharedConnectivityManager = null;
 
     // Network request for listening on changes to Wifi link properties and network capabilities
@@ -446,6 +448,7 @@ public class BaseWifiTracker {
                     + ", ScanInterval5G:" + mScanIntervalBand5GHzMillis
                     + ", mAPmode:" + mAPMode);
         }
+
         if (lifecycle != null) { // Need to add after constructor completes.
             mMainHandler.post(() -> lifecycle.addObserver(mLifecycleObserver));
         }

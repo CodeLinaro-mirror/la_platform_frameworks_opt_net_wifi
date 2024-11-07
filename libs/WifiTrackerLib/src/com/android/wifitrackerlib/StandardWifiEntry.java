@@ -307,7 +307,7 @@ public class StandardWifiEntry extends WifiEntry {
 
     @Override
     public synchronized boolean canConnect() {
-        if (mLevel == WIFI_LEVEL_UNREACHABLE
+        if (mScanResultLevel == WIFI_LEVEL_UNREACHABLE
                 || getConnectedState() != CONNECTED_STATE_DISCONNECTED) {
             return false;
         }
@@ -697,7 +697,7 @@ public class StandardWifiEntry extends WifiEntry {
         final ScanResult bestScanResult = getBestScanResultByLevel(mTargetScanResults);
 
         if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
-            mLevel = bestScanResult != null
+            mScanResultLevel = bestScanResult != null
                     ? mWifiManager.calculateSignalLevel(bestScanResult.level)
                     : WIFI_LEVEL_UNREACHABLE;
         }
@@ -876,7 +876,7 @@ public class StandardWifiEntry extends WifiEntry {
 
     @Override
     protected synchronized String getScanResultDescription() {
-        if (mTargetScanResults.size() == 0) {
+        if (mMatchingScanResults.size() == 0) {
             return "";
         }
 
@@ -891,7 +891,8 @@ public class StandardWifiEntry extends WifiEntry {
     }
 
     private synchronized String getScanResultDescription(int minFrequency, int maxFrequency) {
-        final List<ScanResult> scanResults = mTargetScanResults.stream()
+        final List<ScanResult> scanResults = mMatchingScanResults.values().stream()
+                .flatMap(List::stream)
                 .filter(scanResult -> scanResult.frequency >= minFrequency
                         && scanResult.frequency <= maxFrequency)
                 .sorted(Comparator.comparingInt(scanResult -> -1 * scanResult.level))
