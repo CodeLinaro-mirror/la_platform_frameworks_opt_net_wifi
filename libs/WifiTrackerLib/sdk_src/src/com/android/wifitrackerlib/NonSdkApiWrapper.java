@@ -57,15 +57,6 @@ class NonSdkApiWrapper {
     }
 
     /**
-     * Tries to get WifiInfo from network capabilities if it is VCN-over-Wifi.
-     */
-    static WifiInfo getWifiInfoIfVcn(@NonNull NetworkCapabilities networkCapabilities) {
-        // This is only useful for treating CELLULAR over WIFI as a carrier merged network in
-        // provider model Settings. Since SUW doesn't use the provider model, this is not used.
-        return null;
-    }
-
-    /**
      * Returns whether or not the device is in retail demo mode.
      */
     static boolean isDemoMode(@NonNull Context context) {
@@ -114,6 +105,22 @@ class NonSdkApiWrapper {
      * Whether Android Wifi V Apis flag is enabled.
      */
     static boolean isAndroidVWifiApiEnabled() {
+        // Google3 can't access trunk stable flags, so default to false.
+        return false;
+    }
+
+    /**
+     * Whether the hotspot network unknown status resets connecting state flag is enabled.
+     */
+    static boolean isHotspotNetworkUnknownStatusResetsConnectingStateEnabled() {
+        // Google3 can't access trunk stable flags, so default to false.
+        return false;
+    }
+
+    /**
+     * Whether the hotspot network entry connecting state for details page flag is enabled.
+     */
+    static boolean isHotspotNetworkConnectingStateForDetailsPageEnabled() {
         // Google3 can't access trunk stable flags, so default to false.
         return false;
     }

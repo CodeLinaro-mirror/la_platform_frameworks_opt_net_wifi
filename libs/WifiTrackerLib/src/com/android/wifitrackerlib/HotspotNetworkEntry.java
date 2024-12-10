@@ -197,6 +197,16 @@ public class HotspotNetworkEntry extends WifiEntry {
     }
 
     @Override
+    @ConnectedState
+    public synchronized int getConnectedState() {
+        if (NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled()
+                && mCalledConnect) {
+            return CONNECTED_STATE_CONNECTING;
+        }
+        return super.getConnectedState();
+    }
+
+    @Override
     public int getLevel() {
         if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
             return WIFI_LEVEL_MAX;
@@ -217,7 +227,9 @@ public class HotspotNetworkEntry extends WifiEntry {
         if (mHotspotNetworkData == null) {
             return "";
         }
-        if (mCalledConnect) {
+        if (NonSdkApiWrapper.isHotspotNetworkConnectingStateForDetailsPageEnabled()
+                ? mCalledConnect && !concise // Do not include connecting... for concise summary
+                : mCalledConnect) {
             return mContext.getString(R.string.wifitrackerlib_hotspot_network_connecting);
         }
         if (mConnectionError) {
@@ -450,6 +462,13 @@ public class HotspotNetworkEntry extends WifiEntry {
     public void onConnectionStatusChanged(@ConnectionStatus int status) {
         mLastStatus = status;
         switch (status) {
+            case HotspotNetworkConnectionStatus.CONNECTION_STATUS_UNKNOWN:
+                if (NonSdkApiWrapper.isHotspotNetworkUnknownStatusResetsConnectingStateEnabled()) {
+                    mCalledConnect = false;
+                    mConnectionError = false;
+                    notifyOnUpdated();
+                }
+                break;
             case HotspotNetworkConnectionStatus.CONNECTION_STATUS_ENABLING_HOTSPOT:
                 mCalledConnect = true;
                 mConnectionError = false;

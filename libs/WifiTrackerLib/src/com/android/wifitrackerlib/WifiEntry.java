@@ -25,6 +25,7 @@ import static com.android.wifitrackerlib.Utils.getSingleSecurityTypeFromMultiple
 
 import android.content.Context;
 import android.net.ConnectivityDiagnosticsManager;
+import android.net.ConnectivityManager;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
@@ -37,6 +38,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.AnyThread;
 import androidx.annotation.IntDef;
@@ -70,6 +72,10 @@ import java.util.stream.Collectors;
  * actions on the represented network.
  */
 public class WifiEntry {
+    public static final String TAG = "WifiEntry";
+
+    private static final int MAX_UNDERLYING_NETWORK_DEPTH = 5;
+
     /**
      * Security type based on WifiConfiguration.KeyMgmt
      */
@@ -238,8 +244,8 @@ public class WifiEntry {
     // Callback associated with this WifiEntry. Subclasses should call its methods appropriately.
     private WifiEntryCallback mListener;
     protected final Handler mCallbackHandler;
-
-    protected int mLevel = WIFI_LEVEL_UNREACHABLE;
+    protected int mWifiInfoLevel = WIFI_LEVEL_UNREACHABLE;
+    protected int mScanResultLevel = WIFI_LEVEL_UNREACHABLE;
     protected WifiInfo mWifiInfo;
     protected NetworkInfo mNetworkInfo;
     protected Network mNetwork;
@@ -339,7 +345,10 @@ public class WifiEntry {
      * A value of WIFI_LEVEL_UNREACHABLE indicates an out of range network.
      */
     public int getLevel() {
-        return mLevel;
+        if (mWifiInfoLevel != WIFI_LEVEL_UNREACHABLE) {
+            return mWifiInfoLevel;
+        }
+        return mScanResultLevel;
     };
 
     /**
@@ -367,25 +376,48 @@ public class WifiEntry {
      * Returns whether this network is the default network or not (i.e. this network is the one
      * currently being used to provide internet connection).
      */
-    public boolean isDefaultNetwork() {
+    public synchronized boolean isDefaultNetwork() {
         if (mNetwork != null && mNetwork.equals(mDefaultNetwork)) {
             return true;
         }
 
-        // Try to get a WifiInfo from the default network capabilities in case it's a
-        // VcnTransportInfo with an underlying WifiInfo.
-        if (mDefaultNetworkCapabilities == null) {
+        // Match based on the underlying networks if there are any (e.g. VPN).
+        return doesUnderlyingNetworkMatch(mDefaultNetworkCapabilities, 0);
+    }
+
+    private boolean doesUnderlyingNetworkMatch(@Nullable NetworkCapabilities caps, int depth) {
+        if (depth > MAX_UNDERLYING_NETWORK_DEPTH) {
+            Log.e(TAG, "Underlying network depth greater than max depth of "
+                    + MAX_UNDERLYING_NETWORK_DEPTH);
             return false;
         }
-        WifiInfo defaultWifiInfo = Utils.getWifiInfo(mDefaultNetworkCapabilities);
-        if (defaultWifiInfo != null) {
-            return connectionInfoMatches(defaultWifiInfo);
+
+        if (caps == null) {
+            return false;
         }
 
-        // Match based on the underlying networks if there are any (e.g. VPN).
         List<Network> underlyingNetworks = BuildCompat.isAtLeastT()
-                ? mDefaultNetworkCapabilities.getUnderlyingNetworks() : null;
-        return underlyingNetworks != null && underlyingNetworks.contains(mNetwork);
+                ? caps.getUnderlyingNetworks() : null;
+        if (underlyingNetworks == null) {
+            return false;
+        }
+        if (underlyingNetworks.contains(mNetwork)) {
+            return true;
+        }
+
+        // Check the underlying networks of the underlying networks.
+        ConnectivityManager connectivityManager = mInjector.getConnectivityManager();
+        if (connectivityManager == null) {
+            Log.wtf(TAG, "ConnectivityManager is null!");
+            return false;
+        }
+        for (Network underlying : underlyingNetworks) {
+            if (doesUnderlyingNetworkMatch(
+                    connectivityManager.getNetworkCapabilities(underlying), depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1021,17 +1053,18 @@ public class WifiEntry {
         notifyOnUpdated();
     }
 
-    private synchronized void updateWifiInfo(WifiInfo wifiInfo) {
+    protected synchronized void updateWifiInfo(WifiInfo wifiInfo) {
         if (wifiInfo == null) {
             mWifiInfo = null;
             mConnectedInfo = null;
+            mWifiInfoLevel = WIFI_LEVEL_UNREACHABLE;
             updateSecurityTypes();
             return;
         }
         mWifiInfo = wifiInfo;
         final int wifiInfoRssi = mWifiInfo.getRssi();
         if (wifiInfoRssi != INVALID_RSSI) {
-            mLevel = mWifiManager.calculateSignalLevel(wifiInfoRssi);
+            mWifiInfoLevel = mWifiManager.calculateSignalLevel(wifiInfoRssi);
         }
         if (getConnectedState() == CONNECTED_STATE_CONNECTED) {
             if (mCalledConnect) {

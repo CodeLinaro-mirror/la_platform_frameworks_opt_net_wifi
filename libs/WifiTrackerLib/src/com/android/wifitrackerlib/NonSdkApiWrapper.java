@@ -16,6 +16,9 @@
 
 package com.android.wifitrackerlib;
 
+import static android.net.wifi.flags.Flags.hotspotNetworkConnectingStateForDetailsPage;
+import static android.net.wifi.flags.Flags.hotspotNetworkUnknownStatusResetsConnectingState;
+
 import static com.android.wifi.flags.Flags.androidVWifiApi;
 import static com.android.wifi.flags.Flags.networkProviderBatteryChargingStatus;
 
@@ -25,8 +28,6 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.TransportInfo;
-import android.net.vcn.VcnTransportInfo;
 import android.net.wifi.WifiInfo;
 import android.os.UserManager;
 import android.text.Annotation;
@@ -95,17 +96,6 @@ class NonSdkApiWrapper {
     }
 
     /**
-     * Tries to get WifiInfo from network capabilities if it is VCN-over-Wifi.
-     */
-    static WifiInfo getWifiInfoIfVcn(@NonNull NetworkCapabilities networkCapabilities) {
-        TransportInfo transportInfo = networkCapabilities.getTransportInfo();
-        if (transportInfo instanceof VcnTransportInfo) {
-            return ((VcnTransportInfo) transportInfo).getWifiInfo();
-        }
-        return null;
-    }
-
-    /**
      * Returns whether or not the device is in retail demo mode.
      */
     static boolean isDemoMode(@NonNull Context context) {
@@ -151,5 +141,19 @@ class NonSdkApiWrapper {
     static boolean isAndroidVWifiApiEnabled() {
         // Google3 can't access trunk stable flags, so default to false.
         return androidVWifiApi();
+    }
+
+    /**
+     * Whether the hotspot network unknown status resets connecting state flag is enabled.
+     */
+    static boolean isHotspotNetworkUnknownStatusResetsConnectingStateEnabled() {
+        return hotspotNetworkUnknownStatusResetsConnectingState();
+    }
+
+    /**
+     * Whether the hotspot network entry connecting state for details page flag is enabled.
+     */
+    static boolean isHotspotNetworkConnectingStateForDetailsPageEnabled() {
+        return hotspotNetworkConnectingStateForDetailsPage();
     }
 }
