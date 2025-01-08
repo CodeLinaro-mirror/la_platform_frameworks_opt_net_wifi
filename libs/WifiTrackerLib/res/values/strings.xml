@@ -53,6 +53,9 @@
     <string name="wifitrackerlib_wifi_disabled_transition_disable_indication">Unavailable with current security settings</string>
 
     <!-- Status for networks disabled for unknown reason [CHAR LIMIT=NONE] -->
+    <string name="wifitrackerlib_wifi_disabled_consecutive_failures">Connection failure</string>
+
+    <!-- Status for networks disabled for unknown reason [CHAR LIMIT=NONE] -->
     <string name="wifitrackerlib_wifi_disabled_generic">Disabled</string>
 
     <!-- Summary for networks failing to connect due to one of the following reasons:
