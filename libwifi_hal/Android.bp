@@ -185,7 +185,7 @@ wifi_cc_defaults {
                 whole_static_libs: ["libwifi-hal-slsi"],
             },
             unisoc: {
-                whole_static_libs: ["libwifi-hal-uni"],
+                defaults: ["libwifi-hal-uni"],
             },
             conditions_default: {
                 whole_static_libs: ["libwifi-hal-fallback"],
