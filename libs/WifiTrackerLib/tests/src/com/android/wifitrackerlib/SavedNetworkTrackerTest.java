@@ -53,6 +53,7 @@ import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.net.wifi.hotspot2.pps.Credential;
 import android.net.wifi.hotspot2.pps.HomeSp;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.test.TestLooper;
 
 import androidx.lifecycle.Lifecycle;
@@ -86,6 +87,7 @@ public class SavedNetworkTrackerTest {
     @Mock private Context mMockContext;
     @Mock private Resources mResources;
     @Mock private WifiManager mMockWifiManager;
+    @Mock private PowerManager mPowerManager;
     @Mock private ConnectivityManager mMockConnectivityManager;
     @Mock private ConnectivityDiagnosticsManager mMockConnectivityDiagnosticsManager;
     @Mock private Clock mMockClock;
@@ -155,6 +157,8 @@ public class SavedNetworkTrackerTest {
         when(mMockContext.getResources()).thenReturn(mResources);
         when(mMockContext.getSystemService(ConnectivityDiagnosticsManager.class))
                 .thenReturn(mMockConnectivityDiagnosticsManager);
+        when(mMockContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
+        when(mPowerManager.isInteractive()).thenReturn(true);
         when(mMockClock.millis()).thenReturn(START_MILLIS);
     }
 
