@@ -459,7 +459,6 @@ public class Utils {
                 case NetworkSelectionStatus.DISABLED_ASSOCIATION_REJECTION:
                     return context.getString(R.string.wifitrackerlib_wifi_disabled_generic);
                 case NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT:
-                    return context.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect);
                 case NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY:
                     return context.getString(R.string.wifitrackerlib_wifi_no_internet);
                 case DISABLED_TRANSITION_DISABLE_INDICATION:
