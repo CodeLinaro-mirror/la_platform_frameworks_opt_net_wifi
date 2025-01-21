@@ -43,6 +43,7 @@
     <string name="wifitrackerlib_private_dns_broken" msgid="6049401148262718707">"Kan nie toegang tot private DNS-bediener kry nie"</string>
     <string name="wifitrackerlib_wifi_connected_cannot_provide_internet" msgid="3803471522215612745">"Gekoppel aan toestel. Kan nie internet verskaf nie."</string>
     <string name="wifi_connected_low_quality" msgid="4478331645458058445">"Lae gehalte"</string>
+    <string name="wifi_connected_less_secure" msgid="2385231117439764954">"<xliff:g id="SECURITY_TYPE">%1$s</xliff:g> (minder veilig)"</string>
     <string name="wifitrackerlib_admin_restricted_network" msgid="5439914801076897515">"Word nie deur jou organisasie toegelaat nie"</string>
     <string name="wifitrackerlib_hotspot_network_summary" msgid="7661086683527884190">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> van <xliff:g id="MODEL_NAME">%2$s</xliff:g> af"</string>
     <string name="wifitrackerlib_hotspot_network_summary_new" msgid="1165705867298669621">"{DEVICE_TYPE,select, PHONE{{NETWORK_NAME} van jou foon af}TABLET{{NETWORK_NAME} van jou tablet af}COMPUTER{{NETWORK_NAME} van jou rekenaar af}WATCH{{NETWORK_NAME} van jou horlosie af}VEHICLE{{NETWORK_NAME} van jou voertuig af}other{{NETWORK_NAME} van jou toestel af}}"</string>
@@ -62,7 +63,7 @@
     <string name="wifitrackerlib_wifi_security_short_eap_suiteb" msgid="6335062557041604336">"Suite-B-192"</string>
     <string name="wifitrackerlib_wifi_security_eap_suiteb" msgid="4715703239786225763">"WPA3-Enterprise 192-bis"</string>
     <string name="wifitrackerlib_wifi_security_short_wpa_wpa2" msgid="6770438383385707243">"WPA/WPA2"</string>
-    <string name="wifitrackerlib_wifi_security_wpa_wpa2" msgid="5767878305316110228">"WPA/WPA2-Personal"</string>
+    <string name="wifitrackerlib_wifi_security_wpa_wpa2" msgid="5767878305316110228">"WPA/WPA2-persoonlik"</string>
     <string name="wifitrackerlib_wifi_security_short_wpa_wpa2_wpa3" msgid="4489424775550194618">"WPA/WPA2/WPA3"</string>
     <string name="wifitrackerlib_wifi_security_wpa_wpa2_wpa3" msgid="4154428413248489642">"WPA/WPA2/WPA3-Personal"</string>
     <string name="wifitrackerlib_wifi_security_wep" msgid="7714779033848180369">"WEP"</string>
