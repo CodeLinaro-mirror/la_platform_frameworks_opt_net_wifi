@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"កំពុងពិនិត្យមើលសិទ្ធិចូលប្រើប្រាស់អ៊ីនធឺណិត..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"ការភ្ជាប់​ដោយស្វ័យប្រវត្តិ​ត្រូវបានបិទ"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"បានរក្សាទុកដោយ <xliff:g id="NAME">%1$s</xliff:g>"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"នឹងមិនភ្ជាប់ដោយស្វ័យប្រវត្តិទេ"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"មិនមាន​ការតភ្ជាប់​អ៊ីនធឺណិតទេ"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"បញ្ហា​ការ​ផ្ទៀងផ្ទាត់"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"សូមពិនិត្យមើលពាក្យសម្ងាត់ រួចព្យាយាមម្ដងទៀត"</string>

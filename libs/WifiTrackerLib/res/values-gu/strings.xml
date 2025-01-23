@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"ઇન્ટરનેટ ઍક્સેસ માટે ચેક કરી રહ્યાં છીએ..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"ઑટોમૅટિક રીતે કનેક્ટ કરવાનું બંધ છે"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"<xliff:g id="NAME">%1$s</xliff:g> દ્વારા સચવાયેલ"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"ઑટોમૅટિક રીતે કનેક્ટ થશે નહીં"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"કોઈ ઇન્ટરનેટ ઍક્સેસ નથી"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"પ્રમાણીકરણમાં સમસ્યા"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"પાસવર્ડ ચેક કરો અને ફરી પ્રયાસ કરો"</string>

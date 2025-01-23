@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"انٹرنیٹ تک رسائی کی جانچ ہو رہی ہے..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"خود کار طور پر منسلک ہونا آف ہے"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"‫<xliff:g id="NAME">%1$s</xliff:g> کی جانب سے محفوظ کردہ"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"خودکار طور پر منسلک نہیں ہو گا"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"انٹرنیٹ تک کوئی رسائی نہیں"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"توثیق کا مسئلہ"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"پاس ورڈ چیک کرکے دوبارہ کوشش کریں"</string>

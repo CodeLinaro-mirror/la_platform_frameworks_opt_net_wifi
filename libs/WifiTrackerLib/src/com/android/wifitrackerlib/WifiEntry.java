@@ -249,6 +249,7 @@ public class WifiEntry {
     protected WifiInfo mWifiInfo;
     protected NetworkInfo mNetworkInfo;
     protected Network mNetwork;
+    protected Network mLastNetwork;
     protected NetworkCapabilities mNetworkCapabilities;
     protected Network mDefaultNetwork;
     protected NetworkCapabilities mDefaultNetworkCapabilities;
@@ -378,6 +379,13 @@ public class WifiEntry {
      */
     public synchronized boolean isDefaultNetwork() {
         if (mNetwork != null && mNetwork.equals(mDefaultNetwork)) {
+            return true;
+        }
+
+        if (mLastNetwork != null && mLastNetwork.equals(mDefaultNetwork)) {
+            // Last network may still be default if we've roamed and haven't gotten
+            // onNetworkCapabilitiesChanged for the default network yet, so consider it default for
+            // now.
             return true;
         }
 
@@ -1030,11 +1038,8 @@ public class WifiEntry {
         }
 
         if (!connectionInfoMatches(wifiInfo)) {
-            if (network.equals(mNetwork)) {
-                // WifiInfo doesn't match but the Network matches. This may be due to linked
-                // roaming, so treat as a disconnect.
-                onNetworkLost(network);
-            }
+            // WifiInfo doesn't match, so this network isn't for this WifiEntry.
+            onNetworkLost(network);
             return;
         }
 
@@ -1047,6 +1052,7 @@ public class WifiEntry {
 
         // Connection info matches, so the Network/NetworkCapabilities represent this network
         // and the network is currently connecting or connected.
+        mLastNetwork = mNetwork;
         mNetwork = network;
         mNetworkCapabilities = capabilities;
         updateWifiInfo(wifiInfo);
@@ -1093,11 +1099,12 @@ public class WifiEntry {
      * @param network Network that was lost
      */
     synchronized void onNetworkLost(@NonNull Network network) {
-        if (!network.equals(mNetwork)) {
-            return;
+        if (network.equals(mNetwork)) {
+            clearConnectionInfo();
+        } else if (network.equals(mLastNetwork)) {
+            mLastNetwork = null;
+            notifyOnUpdated();
         }
-        // Network matches, so this network is disconnected.
-        clearConnectionInfo();
     }
 
     /**
@@ -1105,6 +1112,8 @@ public class WifiEntry {
      */
     synchronized void clearConnectionInfo() {
         updateWifiInfo(null);
+        mNetwork = null;
+        mLastNetwork = null;
         mNetworkInfo = null;
         mNetworkCapabilities = null;
         mConnectivityReport = null;
