@@ -721,6 +721,42 @@ public class UtilsTest {
     }
 
     @Test
+    public void testDisconnectedDescription_dhcpErrorWhileEnabled_showsErrorMessage() {
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disconnected))
+                .thenReturn("Saved");
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disabled_network_failure))
+                .thenReturn("IP configuration failure");
+        WifiConfiguration enabledWithDhcpFailure = new WifiConfiguration();
+        NetworkSelectionStatus networkSelectionStatus = spy(new NetworkSelectionStatus.Builder()
+                .build());
+        when(networkSelectionStatus.getDisableReasonCounter(
+                NetworkSelectionStatus.DISABLED_DHCP_FAILURE)).thenReturn(1);
+        enabledWithDhcpFailure.setNetworkSelectionStatus(networkSelectionStatus);
+        assertThat(Utils.getDisconnectedDescription(
+                mMockInjector, mMockContext, enabledWithDhcpFailure, true, true))
+                .isEqualTo("Saved" + STRING_SUMMARY_SEPARATOR + "IP configuration failure");
+    }
+
+    @Test
+    public void testDisconnectedDescription_disabledConsecutiveFailures_showsErrorMessage() {
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disconnected))
+                .thenReturn("Saved");
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disabled_consecutive_failures))
+                .thenReturn("Connection failure");
+        WifiConfiguration consecutiveFailures = new WifiConfiguration();
+        NetworkSelectionStatus networkSelectionStatus = spy(new NetworkSelectionStatus.Builder()
+                .setNetworkSelectionStatus(
+                        NetworkSelectionStatus.NETWORK_SELECTION_TEMPORARY_DISABLED)
+                .setNetworkSelectionDisableReason(
+                        NetworkSelectionStatus.DISABLED_CONSECUTIVE_FAILURES)
+                .build());
+        consecutiveFailures.setNetworkSelectionStatus(networkSelectionStatus);
+        assertThat(Utils.getDisconnectedDescription(
+                mMockInjector, mMockContext, consecutiveFailures, true, true))
+                .isEqualTo("Saved" + STRING_SUMMARY_SEPARATOR + "Connection failure");
+    }
+
+    @Test
     public void testWifiInfoBandString_multipleMloLinks_returnsMultipleBands() {
         assumeTrue(BuildCompat.isAtLeastU());
 
