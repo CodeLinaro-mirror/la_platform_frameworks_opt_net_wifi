@@ -580,6 +580,7 @@ public class SavedNetworkTrackerTest {
         savedNetworkTracker.onStop();
         mTestLooper.dispatchAll();
         when(mMockWifiManager.getCurrentNetwork()).thenReturn(null);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(null);
         savedNetworkTracker.onStart();
         mTestLooper.dispatchAll();
 

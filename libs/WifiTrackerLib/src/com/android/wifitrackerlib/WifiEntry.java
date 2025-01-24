@@ -1000,7 +1000,7 @@ public class WifiEntry {
     /**
      * Returns whether the supplied WifiInfo represents this WifiEntry
      */
-    protected boolean connectionInfoMatches(@NonNull WifiInfo wifiInfo) {
+    boolean connectionInfoMatches(@NonNull WifiInfo wifiInfo) {
         return false;
     }
 

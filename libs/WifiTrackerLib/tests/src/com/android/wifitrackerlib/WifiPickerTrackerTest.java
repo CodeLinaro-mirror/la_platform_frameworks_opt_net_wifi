@@ -850,6 +850,7 @@ public class WifiPickerTrackerTest {
         wifiPickerTracker.onStop();
         mTestLooper.dispatchAll();
         when(mMockWifiManager.getCurrentNetwork()).thenReturn(null);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(null);
         wifiPickerTracker.onStart();
         mTestLooper.dispatchAll();
 

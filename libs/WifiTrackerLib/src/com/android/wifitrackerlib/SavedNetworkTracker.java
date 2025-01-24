@@ -234,8 +234,11 @@ public class SavedNetworkTracker extends BaseWifiTracker {
     protected void handleOnStart() {
         // Clear any stale connection info in case we missed any NetworkCallback.onLost() while in
         // the stopped state.
-        for (WifiEntry wifiEntry : getAllWifiEntries()) {
-            wifiEntry.clearConnectionInfo();
+        WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
+        for (WifiEntry entry : getAllWifiEntries()) {
+            if (wifiInfo == null || !entry.connectionInfoMatches(wifiInfo)) {
+                entry.clearConnectionInfo();
+            }
         }
 
         // Update configs and scans
@@ -254,7 +257,7 @@ public class SavedNetworkTracker extends BaseWifiTracker {
                 // networkId, so we need to set the WifiInfo directly from WifiManager.
                 handleNetworkCapabilitiesChanged(currentNetwork,
                         new NetworkCapabilities.Builder(networkCapabilities)
-                                .setTransportInfo(mWifiManager.getConnectionInfo())
+                                .setTransportInfo(wifiInfo)
                                 .build());
             }
             LinkProperties linkProperties = mConnectivityManager.getLinkProperties(currentNetwork);
