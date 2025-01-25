@@ -189,7 +189,11 @@ public class WifiPickerTrackerTest {
         when(mMockNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
                 .thenReturn(true);
         when(mMockNetworkCapabilities.getTransportInfo()).thenReturn(mMockWifiInfo);
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(true);
         when(mMockVcnNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+                .thenReturn(true);
+        when(mMockVcnNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
                 .thenReturn(true);
         // Use a placeholder TransportInfo since VcnTransportInfo is @hide.
         // NonSdkApiWrapper is mocked to get the WifiInfo from these capabilities.
@@ -1087,6 +1091,7 @@ public class WifiPickerTrackerTest {
                     .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                     .setTransportInfo(nonPrimaryWifiInfo)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build();
             mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
                     mock(Network.class), nonPrimaryCap);
@@ -1097,12 +1102,22 @@ public class WifiPickerTrackerTest {
         // Non-primary Wifi network validation should be ignored.
         assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
 
+        // Cell default + primary Wifi validated but doesn't have internet capability should NOT
+        // trigger low quality.
         when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+                .thenReturn(true);
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(false);
+        mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
+                mMockNetwork, mMockNetworkCapabilities);
+        assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
+
+        // Cell default + primary Wifi validated with internet capability should trigger low
+        // quality.
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
                 .thenReturn(true);
         mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
                 mMockNetwork, mMockNetworkCapabilities);
-
-        // Cell default + primary network validation should trigger low quality
         assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isEqualTo(lowQuality);
 
         // Cell + VPN is default should not trigger low quality, since the VPN underlying network is

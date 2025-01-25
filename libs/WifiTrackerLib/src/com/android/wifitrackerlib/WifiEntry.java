@@ -445,6 +445,8 @@ public class WifiEntry {
      */
     public synchronized boolean isLowQuality() {
         return isPrimaryNetwork() && hasInternetAccess() && !isDefaultNetwork()
+                && mNetworkCapabilities != null
+                && mNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 && mDefaultNetworkCapabilities != null
                 && mDefaultNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
                 && !mDefaultNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
