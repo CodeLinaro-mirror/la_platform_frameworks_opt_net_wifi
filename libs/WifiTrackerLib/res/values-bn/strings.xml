@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"ইন্টারনেট কানেকশন চেক করা হচ্ছে..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"অটোমেটিক কানেক্ট করার ফিচার বন্ধ আছে"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"<xliff:g id="NAME">%1$s</xliff:g> সেভ করেছেন"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"অটোমেটিক কানেক্ট করবে না"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"ইন্টারনেট কানেকশন নেই"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"যাচাইকরণে কোনও সমস্যা হয়েছে"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"পাসওয়ার্ড দেখে নিয়ে আবার চেষ্টা করুন"</string>

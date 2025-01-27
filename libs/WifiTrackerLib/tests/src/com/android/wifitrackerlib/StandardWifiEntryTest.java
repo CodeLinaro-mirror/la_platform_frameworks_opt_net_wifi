@@ -1823,4 +1823,33 @@ public class StandardWifiEntryTest {
 
         assertThat(spyEntry.hasAdminRestrictions()).isEqualTo(true);
     }
+
+
+    @Test
+    public void testIsDefault_newNetworkButLastNetworkStillDefault_returnsTrue() {
+        final int networkId = 1;
+        final WifiConfiguration config = new WifiConfiguration();
+        config.SSID = "\"ssid\"";
+        config.networkId = networkId;
+        final StandardWifiEntry entry = new StandardWifiEntry(
+                mMockInjector, mTestHandler,
+                ssidAndSecurityTypeToStandardWifiEntryKey("ssid", SECURITY_TYPE_OPEN),
+                Collections.singletonList(config), null, mMockWifiManager,
+                false /* forSavedNetworksPage */);
+        when(mMockWifiInfo.getNetworkId()).thenReturn(networkId);
+
+        // Entry is default
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+                .thenReturn(true);
+        entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
+        entry.onDefaultNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
+        assertThat(entry.isDefaultNetwork()).isTrue();
+
+        // Wifi switched to new network before default network callback, entry should still be
+        // default
+        Network otherNetwork = mock(Network.class);
+        when(otherNetwork.getNetId()).thenReturn(2);
+        entry.onNetworkCapabilitiesChanged(otherNetwork, mMockNetworkCapabilities);
+        assertThat(entry.isDefaultNetwork()).isTrue();
+    }
 }
