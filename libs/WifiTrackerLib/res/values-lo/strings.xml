@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"ກຳລັງກວດສອບການເຂົ້າເຖິງອິນເຕີເນັດ..."</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"ການເຊື່ອມຕໍ່ອັດຕະໂນມັດປິດຢູ່"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"ບັນທຶກໄວ້ໂດຍ <xliff:g id="NAME">%1$s</xliff:g>"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"ຈະບໍ່ເຊື່ອມຕໍ່ອັດຕະໂນມັດ"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"ບໍ່ມີການເຊື່ອມຕໍ່ອິນເຕີເນັດ"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"ເກີດບັນຫາການພິສູດຢືນຢັນ"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"ກະລຸນາກວດສອບລະຫັດຜ່ານແລ້ວລອງໃໝ່"</string>
