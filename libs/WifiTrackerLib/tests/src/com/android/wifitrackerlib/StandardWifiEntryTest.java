@@ -121,6 +121,8 @@ public class StandardWifiEntryTest {
         mTestHandler = new Handler(mTestLooper.getLooper());
 
         when(mMockNetworkCapabilities.getTransportInfo()).thenReturn(mMockWifiInfo);
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(true);
         when(mMockWifiInfo.isPrimary()).thenReturn(true);
         when(mMockWifiInfo.getNetworkId()).thenReturn(WifiConfiguration.INVALID_NETWORK_ID);
         when(mMockWifiInfo.getRssi()).thenReturn(WifiInfo.INVALID_RSSI);
@@ -818,6 +820,48 @@ public class StandardWifiEntryTest {
 
     @Test
     public void testShouldShowXLevelIcon_unvalidatedOrNotDefault_returnsTrue() {
+        final int networkId = 1;
+        final WifiConfiguration config = new WifiConfiguration();
+        config.SSID = "\"ssid\"";
+        config.networkId = networkId;
+
+        final StandardWifiEntry entry = new StandardWifiEntry(
+                mMockInjector, mTestHandler,
+                ssidAndSecurityTypeToStandardWifiEntryKey("ssid", SECURITY_TYPE_OPEN),
+                Collections.singletonList(config), null, mMockWifiManager,
+                false /* forSavedNetworksPage */);
+
+        // Disconnected should return false;
+        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
+
+        // Connected but validation attempt not complete, should not show X level icon yet.
+        when(mMockWifiInfo.getNetworkId()).thenReturn(networkId);
+        when(mMockWifiInfo.getRssi()).thenReturn(TestUtils.GOOD_RSSI);
+        entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
+        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
+
+        // Validation attempt complete, should show X level icon.
+        ConnectivityDiagnosticsManager.ConnectivityReport connectivityReport = mock(
+                ConnectivityDiagnosticsManager.ConnectivityReport.class);
+        when(connectivityReport.getNetwork()).thenReturn(mMockNetwork);
+        entry.updateConnectivityReport(connectivityReport);
+        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(true);
+
+        // Internet validated, should not show X level icon.
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+                .thenReturn(true);
+        entry.onNetworkCapabilitiesChanged(mMockNetwork, mMockNetworkCapabilities);
+        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(false);
+
+        // Cell becomes default (i.e. low quality wifi), show X level icon.
+        entry.onDefaultNetworkCapabilitiesChanged(Mockito.mock(Network.class),
+                new NetworkCapabilities.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR).build());
+        assertThat(entry.shouldShowXLevelIcon()).isEqualTo(true);
+    }
+
+    @Test
+    public void testIsLowQuality_unvalidatedOrNotDefault_returnsTrue() {
         final int networkId = 1;
         final WifiConfiguration config = new WifiConfiguration();
         config.SSID = "\"ssid\"";
