@@ -64,6 +64,7 @@ soong_config_string_variable {
         "slsi",
         "wlan0",
         "unisoc",
+        "desktop",
     ],
 }
 
@@ -186,6 +187,9 @@ wifi_cc_defaults {
             },
             unisoc: {
                 defaults: ["libwifi-hal-uni"],
+            },
+            desktop: {
+                whole_static_libs: ["libwifi-hal-desktop"],
             },
             conditions_default: {
                 whole_static_libs: ["libwifi-hal-fallback"],
