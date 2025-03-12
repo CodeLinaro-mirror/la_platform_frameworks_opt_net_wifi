@@ -74,6 +74,7 @@ import android.net.wifi.sharedconnectivity.app.SharedConnectivityClientCallback;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.test.TestLooper;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.telephony.SubscriptionManager;
@@ -115,6 +116,7 @@ public class WifiPickerTrackerTest {
     @Mock private Resources mMockResources;
     @Mock private WifiManager mMockWifiManager;
     @Mock private WifiScanner mWifiScanner;
+    @Mock private PowerManager mPowerManager;
     @Mock private ConnectivityManager mMockConnectivityManager;
     @Mock private ConnectivityDiagnosticsManager mMockConnectivityDiagnosticsManager;
     @Mock private TelephonyManager mMockTelephonyManager;
@@ -186,7 +188,11 @@ public class WifiPickerTrackerTest {
         when(mMockNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
                 .thenReturn(true);
         when(mMockNetworkCapabilities.getTransportInfo()).thenReturn(mMockWifiInfo);
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(true);
         when(mMockVcnNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+                .thenReturn(true);
+        when(mMockVcnNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
                 .thenReturn(true);
         // Use a placeholder TransportInfo since VcnTransportInfo is @hide.
         // NonSdkApiWrapper is mocked to get the WifiInfo from these capabilities.
@@ -220,6 +226,8 @@ public class WifiPickerTrackerTest {
         when(mMockContext.getSystemService(ConnectivityDiagnosticsManager.class))
                 .thenReturn(mMockConnectivityDiagnosticsManager);
         when(mMockContext.getSystemService(WifiScanner.class)).thenReturn(mWifiScanner);
+        when(mMockContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
+        when(mPowerManager.isInteractive()).thenReturn(true);
         when(mMockContext.getSystemService(SharedConnectivityManager.class))
                 .thenReturn(mMockSharedConnectivityManager);
         when(mMockContext.getString(anyInt())).thenReturn("");
@@ -807,6 +815,7 @@ public class WifiPickerTrackerTest {
         wifiPickerTracker.onStop();
         mTestLooper.dispatchAll();
         when(mMockWifiManager.getCurrentNetwork()).thenReturn(null);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(null);
         wifiPickerTracker.onStart();
         mTestLooper.dispatchAll();
 
@@ -1043,6 +1052,7 @@ public class WifiPickerTrackerTest {
                     .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                     .setTransportInfo(nonPrimaryWifiInfo)
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build();
             mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
                     mock(Network.class), nonPrimaryCap);
@@ -1053,12 +1063,22 @@ public class WifiPickerTrackerTest {
         // Non-primary Wifi network validation should be ignored.
         assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
 
+        // Cell default + primary Wifi validated but doesn't have internet capability should NOT
+        // trigger low quality.
         when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+                .thenReturn(true);
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(false);
+        mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
+                mMockNetwork, mMockNetworkCapabilities);
+        assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isNotEqualTo(lowQuality);
+
+        // Cell default + primary Wifi validated with internet capability should trigger low
+        // quality.
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
                 .thenReturn(true);
         mNetworkCallbackCaptor.getValue().onCapabilitiesChanged(
                 mMockNetwork, mMockNetworkCapabilities);
-
-        // Cell default + primary network validation should trigger low quality
         assertThat(wifiPickerTracker.getConnectedWifiEntry().getSummary()).isEqualTo(lowQuality);
 
         // Cell + VPN is default should not trigger low quality, since the VPN underlying network is
@@ -2497,6 +2517,26 @@ public class WifiPickerTrackerTest {
         verify(mWifiScanner, never()).startScan(any(), mScanListenerCaptor.capture());
         verify(mMockWifiManager, never()).startScan();
         verify(mInjector).disableVerboseLogging();
+    }
+
+    /**
+     * Tests that the BaseWifiTracker.Scanner does not scan if the device isn't interactive
+     * (i.e. screen off) regardless if onStart() is called.
+     */
+    @Test
+    public void testScanner_notInteractive_scannerDoesNotStart() {
+        when(mPowerManager.isInteractive()).thenReturn(false);
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+        verify(mMockContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                any(), any(), any());
+        mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
+                new Intent(WifiManager.WIFI_STATE_CHANGED_ACTION).putExtra(
+                        WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_ENABLED));
+
+        verify(mWifiScanner, never()).startScan(any(), any());
+        verify(mMockWifiManager, never()).startScan();
     }
 
     @Test

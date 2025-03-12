@@ -235,6 +235,8 @@ public class PasspointWifiEntryTest {
         when(mMockWifiInfo.getPasspointFqdn()).thenReturn(FQDN);
         when(mMockWifiInfo.getPasspointUniqueId()).thenReturn(
                 getPasspointConfiguration().getUniqueId());
+        when(mMockNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                .thenReturn(true);
 
         PasspointWifiEntry entry = new PasspointWifiEntry(mMockInjector, mTestHandler,
                 getPasspointConfiguration(), mMockWifiManager,
