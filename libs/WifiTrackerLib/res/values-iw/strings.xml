@@ -74,12 +74,12 @@
     <string name="wifitrackerlib_wifi_security_none" msgid="2686062484642847280">"ללא"</string>
     <string name="wifitrackerlib_wifi_security_passpoint" msgid="3980446437188585906">"Passpoint"</string>
     <string name="wifitrackerlib_wifi_passpoint_expired" msgid="7974960573887452566">"התוקף פג"</string>
-    <string name="wifitrackerlib_tap_to_sign_up" msgid="3897017015910817402">"יש להקיש כדי להירשם"</string>
-    <string name="wifitrackerlib_tap_to_renew_subscription_and_connect" msgid="6048420776676138069">"יש להקיש כדי לחדש את המינוי ולהתחבר"</string>
+    <string name="wifitrackerlib_tap_to_sign_up" msgid="3897017015910817402">"יש ללחוץ כדי להירשם"</string>
+    <string name="wifitrackerlib_tap_to_renew_subscription_and_connect" msgid="6048420776676138069">"יש ללחוץ כדי לחדש את המינוי ולהתחבר"</string>
     <string name="wifitrackerlib_osu_opening_provider" msgid="7128677439450712558">"מתבצעת פתיחה של <xliff:g id="PASSPOINTPROVIDER">%1$s</xliff:g>"</string>
     <string name="wifitrackerlib_osu_connect_failed" msgid="3872233609000700930">"לא ניתן להתחבר"</string>
     <string name="wifitrackerlib_osu_completing_sign_up" msgid="4359503050543182480">"מתבצעת השלמה של ההרשמה…"</string>
-    <string name="wifitrackerlib_osu_sign_up_failed" msgid="3964140125523395898">"לא ניתן היה להשלים את ההרשמה. יש להקיש כדי לנסות שוב."</string>
+    <string name="wifitrackerlib_osu_sign_up_failed" msgid="3964140125523395898">"לא ניתן היה להשלים את ההרשמה. יש ללחוץ כדי לנסות שוב."</string>
     <string name="wifitrackerlib_osu_sign_up_complete" msgid="3279606633343124580">"תהליך ההרשמה הסתיים. בתהליך התחברות…"</string>
     <string name="wifitrackerlib_imsi_protection_warning" msgid="7202210931586169466">"‏הרשת הזו מקבלת מזהה SIM שיכול לשמש למעקב אחר מיקום של מכשיר. "<annotation id="url">"למידע נוסף"</annotation></string>
     <string name="wifitrackerlib_wifi_wont_autoconnect_for_now" msgid="4923161724964349851">"‏ה-Wi-Fi לא יתחבר באופן אוטומטי בינתיים"</string>
