@@ -32,7 +32,6 @@ namespace {
 
 const char kSupplicantInitProperty[] = "init.svc.wpa_supplicant";
 const char kSupplicantServiceName[] = "wpa_supplicant";
-const char kMigrationServiceName[] = "vendor.move_wifi_data";
 
 }  // namespace
 
@@ -64,7 +63,6 @@ bool SupplicantManager::StartSupplicant() {
     serial = __system_property_serial(pi);
   }
 
-  property_set("ctl.start", kMigrationServiceName);
   property_set("ctl.start", kSupplicantServiceName);
   sched_yield();
 
@@ -104,7 +102,6 @@ bool SupplicantManager::StopSupplicant() {
     return true;
   }
 
-  property_set("ctl.stop", kMigrationServiceName);
   property_set("ctl.stop", kSupplicantServiceName);
   sched_yield();
 
