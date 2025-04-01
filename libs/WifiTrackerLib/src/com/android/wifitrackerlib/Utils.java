@@ -445,7 +445,8 @@ public class Utils {
                         return context.getString(
                                 R.string.wifitrackerlib_wifi_disabled_password_failure);
                     }
-                    break;
+                    return context.getString(
+                            R.string.wifitrackerlib_wifi_disabled_consecutive_failures);
                 case NetworkSelectionStatus.DISABLED_AUTHENTICATION_FAILURE:
                 case NetworkSelectionStatus.DISABLED_AUTHENTICATION_NO_CREDENTIALS:
                 case NetworkSelectionStatus.DISABLED_AUTHENTICATION_NO_SUBSCRIPTION:
@@ -458,7 +459,6 @@ public class Utils {
                 case NetworkSelectionStatus.DISABLED_ASSOCIATION_REJECTION:
                     return context.getString(R.string.wifitrackerlib_wifi_disabled_generic);
                 case NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT:
-                    return context.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect);
                 case NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY:
                     return context.getString(R.string.wifitrackerlib_wifi_no_internet);
                 case DISABLED_TRANSITION_DISABLE_INDICATION:
@@ -473,6 +473,11 @@ public class Utils {
             if (networkSelectionStatus.getDisableReasonCounter(DISABLED_AUTHENTICATION_FAILURE) > 0
                     && !networkSelectionStatus.hasEverConnected()) {
                 return context.getString(R.string.wifitrackerlib_wifi_disabled_password_failure);
+            }
+            // Show DHCP failure message even if we're not disabled.
+            if (networkSelectionStatus.getDisableReasonCounter(
+                    NetworkSelectionStatus.DISABLED_DHCP_FAILURE) > 0) {
+                return context.getString(R.string.wifitrackerlib_wifi_disabled_network_failure);
             }
         }
         switch (wifiConfiguration.getRecentFailureReason()) {

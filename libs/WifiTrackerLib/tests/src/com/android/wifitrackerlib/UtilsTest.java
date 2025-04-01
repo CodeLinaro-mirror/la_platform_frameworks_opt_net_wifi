@@ -679,8 +679,6 @@ public class UtilsTest {
                 .thenReturn("wifitrackerlib_wifi_disconnected");
         when(mMockContext.getString(R.string.wifitrackerlib_wifi_no_internet))
                 .thenReturn("wifitrackerlib_wifi_no_internet");
-        when(mMockContext.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect))
-                .thenReturn("wifitrackerlib_wifi_no_internet_no_reconnect");
         String noAttributionPackage = "noAttributionPackage";
         when(mMockInjector.getNoAttributionAnnotationPackages())
                 .thenReturn(Set.of(noAttributionPackage));
@@ -716,8 +714,44 @@ public class UtilsTest {
                 mMockInjector, mMockContext, permanentNoInternet, true, true))
                 .isEqualTo(new StringJoiner(STRING_SUMMARY_SEPARATOR)
                         .add("wifitrackerlib_wifi_disconnected")
-                        .add("wifitrackerlib_wifi_no_internet_no_reconnect")
+                        .add("wifitrackerlib_wifi_no_internet")
                         .toString());
+    }
+
+    @Test
+    public void testDisconnectedDescription_dhcpErrorWhileEnabled_showsErrorMessage() {
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disconnected))
+                .thenReturn("Saved");
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disabled_network_failure))
+                .thenReturn("IP configuration failure");
+        WifiConfiguration enabledWithDhcpFailure = new WifiConfiguration();
+        NetworkSelectionStatus networkSelectionStatus = spy(new NetworkSelectionStatus.Builder()
+                .build());
+        when(networkSelectionStatus.getDisableReasonCounter(
+                NetworkSelectionStatus.DISABLED_DHCP_FAILURE)).thenReturn(1);
+        enabledWithDhcpFailure.setNetworkSelectionStatus(networkSelectionStatus);
+        assertThat(Utils.getDisconnectedDescription(
+                mMockInjector, mMockContext, enabledWithDhcpFailure, true, true))
+                .isEqualTo("Saved" + STRING_SUMMARY_SEPARATOR + "IP configuration failure");
+    }
+
+    @Test
+    public void testDisconnectedDescription_disabledConsecutiveFailures_showsErrorMessage() {
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disconnected))
+                .thenReturn("Saved");
+        when(mMockContext.getString(R.string.wifitrackerlib_wifi_disabled_consecutive_failures))
+                .thenReturn("Connection failure");
+        WifiConfiguration consecutiveFailures = new WifiConfiguration();
+        NetworkSelectionStatus networkSelectionStatus = spy(new NetworkSelectionStatus.Builder()
+                .setNetworkSelectionStatus(
+                        NetworkSelectionStatus.NETWORK_SELECTION_TEMPORARY_DISABLED)
+                .setNetworkSelectionDisableReason(
+                        NetworkSelectionStatus.DISABLED_CONSECUTIVE_FAILURES)
+                .build());
+        consecutiveFailures.setNetworkSelectionStatus(networkSelectionStatus);
+        assertThat(Utils.getDisconnectedDescription(
+                mMockInjector, mMockContext, consecutiveFailures, true, true))
+                .isEqualTo("Saved" + STRING_SUMMARY_SEPARATOR + "Connection failure");
     }
 
     @Test

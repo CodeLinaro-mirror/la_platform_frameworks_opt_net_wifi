@@ -33,9 +33,6 @@
     <!-- Summary for saved networks [CHAR LIMIT=NONE]-->
     <string name="wifitrackerlib_saved_network">Saved by <xliff:g id="name" example="Wifi App">%1$s</xliff:g></string>
 
-    <!-- Summary for the network but no internet connection was detected. [CHAR LIMIT=NONE] -->
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect">Won\u2019t automatically connect</string>
-
     <!-- Summary for the remembered network but no internet connection was detected. [CHAR LIMIT=NONE] -->
     <string name="wifitrackerlib_wifi_no_internet">No internet access</string>
 
@@ -51,6 +48,9 @@
 
     <!-- Status for networks disabled due to transition disable indication [CHAR LIMIT=NONE] -->
     <string name="wifitrackerlib_wifi_disabled_transition_disable_indication">Unavailable with current security settings</string>
+
+    <!-- Status for networks disabled for unknown reason [CHAR LIMIT=NONE] -->
+    <string name="wifitrackerlib_wifi_disabled_consecutive_failures">Connection failure</string>
 
     <!-- Status for networks disabled for unknown reason [CHAR LIMIT=NONE] -->
     <string name="wifitrackerlib_wifi_disabled_generic">Disabled</string>

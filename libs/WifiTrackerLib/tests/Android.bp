@@ -28,7 +28,7 @@ java_defaults {
         "mockito-target-extended-minus-junit4",
         "truth",
         "wifi_aconfig_flags_lib",
-        "Robolectric_all-target_upstream",
+        "Robolectric_all-target",
     ],
 
     libs: [
