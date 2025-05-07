@@ -249,6 +249,7 @@ public class WifiEntry {
     protected WifiInfo mWifiInfo;
     protected NetworkInfo mNetworkInfo;
     protected Network mNetwork;
+    protected Network mLastNetwork;
     protected NetworkCapabilities mNetworkCapabilities;
     protected Network mDefaultNetwork;
     protected NetworkCapabilities mDefaultNetworkCapabilities;
@@ -381,6 +382,13 @@ public class WifiEntry {
             return true;
         }
 
+        if (mLastNetwork != null && mLastNetwork.equals(mDefaultNetwork)) {
+            // Last network may still be default if we've roamed and haven't gotten
+            // onNetworkCapabilitiesChanged for the default network yet, so consider it default for
+            // now.
+            return true;
+        }
+
         // Match based on the underlying networks if there are any (e.g. VPN).
         return doesUnderlyingNetworkMatch(mDefaultNetworkCapabilities, 0);
     }
@@ -437,6 +445,8 @@ public class WifiEntry {
      */
     public synchronized boolean isLowQuality() {
         return isPrimaryNetwork() && hasInternetAccess() && !isDefaultNetwork()
+                && mNetworkCapabilities != null
+                && mNetworkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 && mDefaultNetworkCapabilities != null
                 && mDefaultNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
                 && !mDefaultNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
@@ -992,7 +1002,7 @@ public class WifiEntry {
     /**
      * Returns whether the supplied WifiInfo represents this WifiEntry
      */
-    protected boolean connectionInfoMatches(@NonNull WifiInfo wifiInfo) {
+    boolean connectionInfoMatches(@NonNull WifiInfo wifiInfo) {
         return false;
     }
 
@@ -1030,11 +1040,8 @@ public class WifiEntry {
         }
 
         if (!connectionInfoMatches(wifiInfo)) {
-            if (network.equals(mNetwork)) {
-                // WifiInfo doesn't match but the Network matches. This may be due to linked
-                // roaming, so treat as a disconnect.
-                onNetworkLost(network);
-            }
+            // WifiInfo doesn't match, so this network isn't for this WifiEntry.
+            onNetworkLost(network);
             return;
         }
 
@@ -1047,6 +1054,7 @@ public class WifiEntry {
 
         // Connection info matches, so the Network/NetworkCapabilities represent this network
         // and the network is currently connecting or connected.
+        mLastNetwork = mNetwork;
         mNetwork = network;
         mNetworkCapabilities = capabilities;
         updateWifiInfo(wifiInfo);
@@ -1093,18 +1101,21 @@ public class WifiEntry {
      * @param network Network that was lost
      */
     synchronized void onNetworkLost(@NonNull Network network) {
-        if (!network.equals(mNetwork)) {
-            return;
+        if (network.equals(mNetwork)) {
+            clearConnectionInfo(true);
+        } else if (network.equals(mLastNetwork)) {
+            mLastNetwork = null;
+            notifyOnUpdated();
         }
-        // Network matches, so this network is disconnected.
-        clearConnectionInfo();
     }
 
     /**
      * Clears any connection info from this entry.
      */
-    synchronized void clearConnectionInfo() {
+    synchronized void clearConnectionInfo(boolean notify) {
         updateWifiInfo(null);
+        mNetwork = null;
+        mLastNetwork = null;
         mNetworkInfo = null;
         mNetworkCapabilities = null;
         mConnectivityReport = null;
@@ -1118,7 +1129,7 @@ public class WifiEntry {
                 }
             });
         }
-        notifyOnUpdated();
+        if (notify) notifyOnUpdated();
     }
 
     /**

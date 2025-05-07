@@ -288,12 +288,6 @@ public class WifiPickerTracker extends BaseWifiTracker {
     @WorkerThread
     @Override
     protected void handleOnStart() {
-        // Clear any stale connection info in case we missed any NetworkCallback.onLost() while in
-        // the stopped state.
-        for (WifiEntry wifiEntry : getAllWifiEntries()) {
-            wifiEntry.clearConnectionInfo();
-        }
-
         // Update configs and scans
         updateWifiConfigurationsInternal();
         updatePasspointConfigurations(mWifiManager.getPasspointConfigurations());
@@ -302,6 +296,12 @@ public class WifiPickerTracker extends BaseWifiTracker {
 
         // Trigger callbacks manually now to avoid waiting until the first calls to update state.
         handleDefaultSubscriptionChanged(SubscriptionManager.getDefaultDataSubscriptionId());
+        // Clear any stale connection info in case we missed any NetworkCallback.onLost() while in
+        // the stopped state, but don't notify the listener to avoid flicker from disconnected ->
+        // connected in case the network is still the same.
+        for (WifiEntry entry : getAllWifiEntries()) {
+            entry.clearConnectionInfo(false);
+        }
         Network currentNetwork = mWifiManager.getCurrentNetwork();
         if (currentNetwork != null) {
             NetworkCapabilities networkCapabilities =

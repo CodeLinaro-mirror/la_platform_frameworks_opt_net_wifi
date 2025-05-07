@@ -43,6 +43,7 @@ import android.net.wifi.sharedconnectivity.app.SharedConnectivityManager;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivitySettingsState;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -161,6 +162,7 @@ public class BaseWifiTracker {
     protected final WifiManager mWifiManager;
     protected final ConnectivityManager mConnectivityManager;
     protected final ConnectivityDiagnosticsManager mConnectivityDiagnosticsManager;
+    protected final PowerManager mPowerManager;
     protected final Handler mMainHandler;
     protected final Handler mWorkerHandler;
     protected final long mMaxScanAgeMillis;
@@ -335,6 +337,7 @@ public class BaseWifiTracker {
         mConnectivityManager = connectivityManager;
         mConnectivityDiagnosticsManager =
                 context.getSystemService(ConnectivityDiagnosticsManager.class);
+        mPowerManager = context.getSystemService(PowerManager.class);
         if (mInjector.isSharedConnectivityFeatureEnabled() && BuildCompat.isAtLeastU()) {
             mSharedConnectivityManager = context.getSystemService(SharedConnectivityManager.class);
             mSharedConnectivityCallback = createSharedConnectivityCallback();
@@ -791,7 +794,8 @@ public class BaseWifiTracker {
          * Scanning should only happen when Wi-Fi is enabled and the activity is started.
          */
         private boolean shouldScan() {
-            return mIsWifiEnabled && mIsStartedState && !mIsScanningDisabled;
+            return mIsWifiEnabled && mIsStartedState && !mIsScanningDisabled
+                    && mPowerManager.isInteractive();
         }
 
         @WorkerThread
@@ -838,13 +842,15 @@ public class BaseWifiTracker {
             if (!shouldScan()) {
                 Log.e(mTag, "Scan loop called even though we shouldn't be scanning!"
                         + " mIsWifiEnabled=" + mIsWifiEnabled
-                        + " mIsStartedState=" + mIsStartedState);
+                        + " mIsStartedState=" + mIsStartedState
+                        + " PowerManager.isInteractive()=" + mPowerManager.isInteractive());
                 return;
             }
             if (!isAppVisible()) {
                 Log.e(mTag, "Scan loop called even though app isn't visible anymore!"
                         + " mIsWifiEnabled=" + mIsWifiEnabled
-                        + " mIsStartedState=" + mIsStartedState);
+                        + " mIsStartedState=" + mIsStartedState
+                        + " PowerManager.isInteractive()=" + mPowerManager.isInteractive());
                 return;
             }
             if (isVerboseLoggingEnabled()) {

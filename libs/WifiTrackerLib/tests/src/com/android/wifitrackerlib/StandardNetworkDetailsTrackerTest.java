@@ -49,6 +49,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.test.TestLooper;
 
 import androidx.lifecycle.Lifecycle;
@@ -78,6 +79,7 @@ public class StandardNetworkDetailsTrackerTest {
     @Mock private Resources mResources;
     @Mock private WifiManager mMockWifiManager;
     @Mock private WifiScanner mWifiScanner;
+    @Mock private PowerManager mPowerManager;
     @Mock private ConnectivityManager mMockConnectivityManager;
     @Mock private ConnectivityDiagnosticsManager mMockConnectivityDiagnosticsManager;
     @Mock private Clock mMockClock;
@@ -129,6 +131,8 @@ public class StandardNetworkDetailsTrackerTest {
         when(mMockContext.getSystemService(ConnectivityDiagnosticsManager.class))
                 .thenReturn(mMockConnectivityDiagnosticsManager);
         when(mMockContext.getSystemService(WifiScanner.class)).thenReturn(mWifiScanner);
+        when(mMockContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
+        when(mPowerManager.isInteractive()).thenReturn(true);
         when(mMockClock.millis()).thenReturn(START_MILLIS);
     }
 

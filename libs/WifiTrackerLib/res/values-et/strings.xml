@@ -20,7 +20,6 @@
     <string name="wifitrackerlib_checking_for_internet_access" msgid="4787495471423429472">"Internetiühenduse kontrollimine …"</string>
     <string name="wifitrackerlib_auto_connect_disable" msgid="4714835547164460651">"Automaatne ühendamine on väljas"</string>
     <string name="wifitrackerlib_saved_network" msgid="5353460010746484376">"Salvestas: <xliff:g id="NAME">%1$s</xliff:g>"</string>
-    <string name="wifitrackerlib_wifi_no_internet_no_reconnect" msgid="6618216332537706908">"Ei ühendata automaatselt"</string>
     <string name="wifitrackerlib_wifi_no_internet" msgid="4998563744669636949">"Internetiühendus puudub"</string>
     <string name="wifitrackerlib_wifi_disabled_password_failure" msgid="2850244218754633550">"Autentimise probleem"</string>
     <string name="wifitrackerlib_wifi_check_password_try_again" msgid="2327777719175574699">"Kontrollige parooli ja proovige uuesti"</string>

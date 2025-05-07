@@ -679,8 +679,6 @@ public class UtilsTest {
                 .thenReturn("wifitrackerlib_wifi_disconnected");
         when(mMockContext.getString(R.string.wifitrackerlib_wifi_no_internet))
                 .thenReturn("wifitrackerlib_wifi_no_internet");
-        when(mMockContext.getString(R.string.wifitrackerlib_wifi_no_internet_no_reconnect))
-                .thenReturn("wifitrackerlib_wifi_no_internet_no_reconnect");
         String noAttributionPackage = "noAttributionPackage";
         when(mMockInjector.getNoAttributionAnnotationPackages())
                 .thenReturn(Set.of(noAttributionPackage));
@@ -716,7 +714,7 @@ public class UtilsTest {
                 mMockInjector, mMockContext, permanentNoInternet, true, true))
                 .isEqualTo(new StringJoiner(STRING_SUMMARY_SEPARATOR)
                         .add("wifitrackerlib_wifi_disconnected")
-                        .add("wifitrackerlib_wifi_no_internet_no_reconnect")
+                        .add("wifitrackerlib_wifi_no_internet")
                         .toString());
     }
 

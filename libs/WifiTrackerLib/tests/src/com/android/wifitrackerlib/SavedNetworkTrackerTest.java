@@ -22,6 +22,7 @@ import static com.android.wifitrackerlib.TestUtils.GOOD_RSSI;
 import static com.android.wifitrackerlib.TestUtils.buildScanResult;
 import static com.android.wifitrackerlib.TestUtils.buildWifiConfiguration;
 import static com.android.wifitrackerlib.WifiEntry.CONNECTED_STATE_CONNECTED;
+import static com.android.wifitrackerlib.WifiEntry.CONNECTED_STATE_DISCONNECTED;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -53,6 +54,7 @@ import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.net.wifi.hotspot2.pps.Credential;
 import android.net.wifi.hotspot2.pps.HomeSp;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.test.TestLooper;
 
 import androidx.lifecycle.Lifecycle;
@@ -70,6 +72,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class SavedNetworkTrackerTest {
@@ -86,6 +89,7 @@ public class SavedNetworkTrackerTest {
     @Mock private Context mMockContext;
     @Mock private Resources mResources;
     @Mock private WifiManager mMockWifiManager;
+    @Mock private PowerManager mPowerManager;
     @Mock private ConnectivityManager mMockConnectivityManager;
     @Mock private ConnectivityDiagnosticsManager mMockConnectivityDiagnosticsManager;
     @Mock private Clock mMockClock;
@@ -155,6 +159,8 @@ public class SavedNetworkTrackerTest {
         when(mMockContext.getResources()).thenReturn(mResources);
         when(mMockContext.getSystemService(ConnectivityDiagnosticsManager.class))
                 .thenReturn(mMockConnectivityDiagnosticsManager);
+        when(mMockContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
+        when(mPowerManager.isInteractive()).thenReturn(true);
         when(mMockClock.millis()).thenReturn(START_MILLIS);
     }
 
@@ -490,6 +496,75 @@ public class SavedNetworkTrackerTest {
     }
 
     /**
+     * Tests that the connected WifiEntry won't flicker from connected->disconnected->connected
+     * upon onStart().
+     */
+    @Test
+    public void testGetConnectedWifiEntry_alreadyConnectedOnStart_doesNotFlickerToDisconnected() {
+        final SavedNetworkTracker savedNetworkTracker = createTestSavedNetworkTracker();
+        final WifiConfiguration config = new WifiConfiguration();
+        config.SSID = "\"ssid\"";
+        config.networkId = 1;
+        when(mMockWifiManager.getConfiguredNetworks())
+                .thenReturn(Collections.singletonList(config));
+        when(mMockWifiInfo.getNetworkId()).thenReturn(1);
+        when(mMockWifiInfo.getRssi()).thenReturn(-50);
+
+        savedNetworkTracker.onStart();
+        mTestLooper.dispatchAll();
+
+        assertThat(savedNetworkTracker.getSavedWifiEntries()).isNotEmpty();
+        WifiEntry entry = savedNetworkTracker.getSavedWifiEntries().get(0);
+        assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_CONNECTED);
+
+        // Register a callback to verify we don't flicker out of CONNECTED state.
+        AtomicBoolean callbackWasCalled = new AtomicBoolean(false);
+        WifiEntry.WifiEntryCallback callback = () -> {
+            assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_CONNECTED);
+            callbackWasCalled.set(true);
+        };
+        entry.setListener(callback);
+        savedNetworkTracker.onStop();
+        savedNetworkTracker.onStart();
+        mTestLooper.dispatchAll();
+        // Success.
+        assertThat(callbackWasCalled.get()).isTrue();
+    }
+
+    /**
+     * Tests that the connected WifiEntry will be disconnected if we've disconnected before
+     * onStart().
+     */
+    @Test
+    public void testGetConnectedWifiEntry_disconnectBeforeOnStart_isDisconnected() {
+        final SavedNetworkTracker savedNetworkTracker = createTestSavedNetworkTracker();
+        final WifiConfiguration config = new WifiConfiguration();
+        config.SSID = "\"ssid\"";
+        config.networkId = 1;
+        when(mMockWifiManager.getConfiguredNetworks())
+                .thenReturn(Collections.singletonList(config));
+        when(mMockWifiInfo.getNetworkId()).thenReturn(1);
+        when(mMockWifiInfo.getRssi()).thenReturn(-50);
+
+        savedNetworkTracker.onStart();
+        mTestLooper.dispatchAll();
+
+        assertThat(savedNetworkTracker.getSavedWifiEntries()).isNotEmpty();
+        WifiEntry entry = savedNetworkTracker.getSavedWifiEntries().get(0);
+        assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_CONNECTED);
+
+        // Disconnect the network from ConnectivityManager's perspective, but keep
+        // WifiManager.getConnectionInfo()/getCurrentNetwork() returning the old network, which may
+        // happen by race condition.
+        when(mMockConnectivityManager.getNetworkCapabilities(any())).thenReturn(null);
+        savedNetworkTracker.onStop();
+        savedNetworkTracker.onStart();
+        mTestLooper.dispatchAll();
+        // Entry should be disconnected.
+        assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_DISCONNECTED);
+    }
+
+    /**
      * Tests that connecting to a network will update that network to CONNECTED_STATE_CONNECTED.
      */
     @Test
@@ -576,6 +651,7 @@ public class SavedNetworkTrackerTest {
         savedNetworkTracker.onStop();
         mTestLooper.dispatchAll();
         when(mMockWifiManager.getCurrentNetwork()).thenReturn(null);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(null);
         savedNetworkTracker.onStart();
         mTestLooper.dispatchAll();
 
