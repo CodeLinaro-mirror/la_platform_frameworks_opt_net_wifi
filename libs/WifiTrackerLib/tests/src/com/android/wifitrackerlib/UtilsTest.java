@@ -394,13 +394,13 @@ public class UtilsTest {
 
     @Test
     public void testGetCarrierName() {
-        when(mSpecifiedTm.getSimCarrierIdName()).thenReturn(TEST_CARRIER_NAME);
+        when(mSpecifiedTm.getSimOperatorName()).thenReturn(TEST_CARRIER_NAME);
         assertEquals(TEST_CARRIER_NAME, getCarrierNameForSubId(mMockContext, TEST_CARRIER_ID));
     }
 
     @Test
     public void testGetCarrierNameWithInvalidSubId() {
-        when(mSpecifiedTm.getSimCarrierIdName()).thenReturn(TEST_CARRIER_NAME);
+        when(mSpecifiedTm.getSimOperatorName()).thenReturn(TEST_CARRIER_NAME);
         assertNull(getCarrierNameForSubId(mMockContext,
                 SubscriptionManager.INVALID_SUBSCRIPTION_ID));
     }

@@ -651,11 +651,7 @@ public class Utils {
         if (specifiedTm == null) {
             return null;
         }
-        CharSequence name = specifiedTm.getSimCarrierIdName();
-        if (name == null) {
-            return null;
-        }
-        return name.toString();
+        return specifiedTm.getSimOperatorName();
     }
 
     static boolean isServerCertUsedNetwork(@NonNull WifiConfiguration config) {
