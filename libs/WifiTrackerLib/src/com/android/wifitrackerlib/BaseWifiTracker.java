@@ -19,6 +19,7 @@ package com.android.wifitrackerlib;
 import static android.net.NetworkCapabilities.TRANSPORT_WIFI;
 import static android.os.Build.VERSION_CODES;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
@@ -33,6 +34,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.WifiStateChangedListener;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.sharedconnectivity.app.HotspotNetwork;
 import android.net.wifi.sharedconnectivity.app.HotspotNetworkConnectionStatus;
@@ -210,6 +212,9 @@ public class BaseWifiTracker {
 
     @Nullable protected SharedConnectivityManager mSharedConnectivityManager = null;
 
+    // This is null for SDK levels less than Baklava.
+    private final WifiStateChangedListener mWifiStateChangedListener;
+
     // Network request for listening on changes to Wifi link properties and network capabilities
     // such as captive portal availability.
     private final NetworkRequest mNetworkRequest = new NetworkRequest.Builder()
@@ -355,6 +360,7 @@ public class BaseWifiTracker {
      * @param scanIntervalMillis Interval between initiating scans.
      */
     @SuppressWarnings("StaticAssignmentInConstructor")
+    @SuppressLint("NewApi")
     BaseWifiTracker(
             @NonNull WifiTrackerInjector injector,
             @Nullable Lifecycle lifecycle, @NonNull Context context,
@@ -380,6 +386,19 @@ public class BaseWifiTracker {
             mSharedConnectivityCallback = createSharedConnectivityCallback();
         }
         mWifiScanner = mContext.getSystemService(WifiScanner.class);
+        if (mInjector.isWifiStateChangedListenerEnabled() && mInjector.isAtLeastB()) {
+            mWifiStateChangedListener = new WifiStateChangedListener() {
+                @Override
+                public void onWifiStateChanged() {
+                    mWifiState = mWifiManager.getWifiState();
+                    mScanner.onWifiStateChanged(mWifiState == WifiManager.WIFI_STATE_ENABLED);
+                    notifyOnWifiStateChanged();
+                    handleWifiStateChangedAction();
+                }
+            };
+        } else {
+            mWifiStateChangedListener = null;
+        }
         mMainHandler = mainHandler;
         mWorkerHandler = workerHandler;
         mDefaultMaxScanAgeMillis = maxScanAgeMillis;
@@ -479,6 +498,7 @@ public class BaseWifiTracker {
      * Registers the broadcast receiver and network callbacks and starts the scanning mechanism.
      */
     @MainThread
+    @SuppressLint("NewApi")
     public void onStart() {
         if (isVerboseLoggingEnabled()) {
             Log.v(mTag, "onStart");
@@ -490,7 +510,14 @@ public class BaseWifiTracker {
 
         mWorkerHandler.post(() -> {
             IntentFilter filter = new IntentFilter();
-            filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+            if (mWifiStateChangedListener != null
+                    && mInjector.isWifiStateChangedListenerEnabled() && mInjector.isAtLeastB()) {
+                mWifiManager.addWifiStateChangedListener((c) -> mWorkerHandler.post(c),
+                        mWifiStateChangedListener);
+                mWifiStateChangedListener.onWifiStateChanged();
+            } else {
+                filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+            }
             if (!mIsScanningDisabled) {
                 filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
             }
@@ -523,6 +550,7 @@ public class BaseWifiTracker {
      * Unregisters the broadcast receiver, network callbacks, and pauses the scanning mechanism.
      */
     @MainThread
+    @SuppressLint("NewApi")
     public void onStop() {
         if (isVerboseLoggingEnabled()) {
             Log.v(mTag, "onStop");
@@ -533,6 +561,11 @@ public class BaseWifiTracker {
         }
         mWorkerHandler.post(() -> {
             try {
+                if (mWifiStateChangedListener != null
+                        && mInjector.isWifiStateChangedListenerEnabled()
+                        && mInjector.isAtLeastB()) {
+                    mWifiManager.removeWifiStateChangedListener(mWifiStateChangedListener);
+                }
                 mContext.unregisterReceiver(mBroadcastReceiver);
                 mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
                 mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
@@ -558,8 +591,14 @@ public class BaseWifiTracker {
      * the worker thread runnable posted in onStop() runs.
      */
     @MainThread
+    @SuppressLint("NewApi")
     public void onDestroy() {
         try {
+            if (mWifiStateChangedListener != null
+                    && mInjector.isWifiStateChangedListenerEnabled()
+                    && mInjector.isAtLeastB()) {
+                mWifiManager.removeWifiStateChangedListener(mWifiStateChangedListener);
+            }
             mContext.unregisterReceiver(mBroadcastReceiver);
             mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
             mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
