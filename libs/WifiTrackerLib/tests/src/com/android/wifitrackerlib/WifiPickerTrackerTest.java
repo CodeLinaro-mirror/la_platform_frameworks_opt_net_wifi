@@ -2236,6 +2236,7 @@ public class WifiPickerTrackerTest {
         wifiPickerTracker.onStart();
         mTestLooper.dispatchAll();
         // Entry should be disconnected.
+        assertThat(wifiPickerTracker.getConnectedWifiEntry()).isNull();
         assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_DISCONNECTED);
     }
 
