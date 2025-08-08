@@ -245,12 +245,10 @@ public class WifiPickerTrackerTest {
         when(mMockContext.getSystemService(SharedConnectivityManager.class))
                 .thenReturn(mMockSharedConnectivityManager);
         when(mMockContext.getString(anyInt())).thenReturn("");
-        when(mInjector.isSharedConnectivityFeatureEnabled()).thenReturn(true);
         when(mMockResources.getStringArray(R.array.wifitrackerlib_wifi_status)).thenReturn(
                 new String[]{"", "Scanning", "Connecting", "Authenticating", "Obtaining IP address",
                         "Connected", "Suspended", "Disconnecting", "Unsuccessful", "Blocked",
                         "Temporarily avoiding poor connection"});
-        when(mInjector.isSharedConnectivityFeatureEnabled()).thenReturn(true);
         when(mInjector.getConnectivityManager()).thenReturn(mMockConnectivityManager);
         when(mInjector.isWifiStateChangedListenerEnabled()).thenReturn(false);
         when(mInjector.isAtLeastB()).thenReturn(false);
@@ -3205,6 +3203,21 @@ public class WifiPickerTrackerTest {
 
         assertThat(wifiPickerTracker.getWifiEntries().stream().filter(
                 entry -> entry instanceof KnownNetworkEntry).toList()).isEmpty();
+    }
+
+    @Test
+    public void testNoSharedConnectivityServiceConfigured() {
+        when(mMockContext.getSystemService(SharedConnectivityManager.class)).thenReturn(null);
+        when(mMockWifiManager.getScanResults())
+                .thenReturn(
+                        Collections.singletonList(
+                                buildScanResult("ssid", "bssid", START_MILLIS, "[PSK/SAE]")));
+
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+
+        assertThat(wifiPickerTracker.getWifiEntries()).hasSize(1);
     }
 
     @Test
