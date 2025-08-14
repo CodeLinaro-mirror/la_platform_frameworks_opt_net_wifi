@@ -23,6 +23,7 @@ import static android.net.wifi.WifiInfo.DEFAULT_MAC_ADDRESS;
 import static java.security.cert.PKIXReason.NO_TRUST_ANCHOR;
 
 import android.annotation.NonNull;
+import android.app.ActivityManager;
 import android.app.AppOpsManager;
 import android.content.Context;
 import android.net.MacAddress;
@@ -124,6 +125,7 @@ public class PasspointManager {
     private final WifiCarrierInfoManager mWifiCarrierInfoManager;
     private final MacAddressUtil mMacAddressUtil;
     private final WifiPermissionsUtil mWifiPermissionsUtil;
+    private final boolean mIsLowMemory;
 
     /**
      * Map of package name of an app to the app ops changed listener for the app.
@@ -332,6 +334,8 @@ public class PasspointManager {
                 new SharedDataSourceHandler()));
         mPasspointProvisioner = objectFactory.makePasspointProvisioner(context, wifiNative,
                 this, wifiMetrics);
+        ActivityManager activityManager = context.getSystemService(ActivityManager.class);
+        mIsLowMemory = activityManager.isLowRamDevice();
         mAppOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
         sPasspointManager = this;
         mMacAddressUtil = macAddressUtil;
@@ -420,6 +424,16 @@ public class PasspointManager {
             Log.e(TAG, "UID " + uid + " not visible to the current user");
             return false;
         }
+        if (config.getServiceFriendlyNames() != null && isFromSuggestion) {
+            Log.e(TAG, "Passpoint from suggestion should not have ServiceFriendlyNames");
+            return false;
+        }
+        if (getPasspointProviderWithPackage(packageName).size()
+                >= WifiManager.getMaxNumberOfNetworkSuggestionsPerApp(mIsLowMemory)) {
+            Log.e(TAG, "packageName " + packageName + " has too many passpoint with exceed the "
+                    + "limitation");
+            return false;
+        }
 
         mWifiCarrierInfoManager.tryUpdateCarrierIdForPasspoint(config);
         // Create a provider and install the necessary certificates and keys.
@@ -486,7 +500,10 @@ public class PasspointManager {
         }
         newProvider.enableVerboseLogging(mVerboseLoggingEnabled ? 1 : 0);
         mProviders.put(config.getUniqueId(), newProvider);
-        mWifiConfigManager.saveToStore(true /* forceWrite */);
+        if (!isFromSuggestion) {
+            // Suggestions will be handled by the WifiNetworkSuggestionsManager
+            mWifiConfigManager.saveToStore(true /* forceWrite */);
+        }
         if (!isFromSuggestion && newProvider.getPackageName() != null) {
             startTrackingAppOpsChange(newProvider.getPackageName(), uid);
         }
@@ -524,7 +541,10 @@ public class PasspointManager {
                 provider.getWifiConfig().getKey());
         String uniqueId = provider.getConfig().getUniqueId();
         mProviders.remove(uniqueId);
-        mWifiConfigManager.saveToStore(true /* forceWrite */);
+        if (!provider.isFromSuggestion()) {
+            // Suggestions will be handled by the WifiNetworkSuggestionsManager
+            mWifiConfigManager.saveToStore(true /* forceWrite */);
+        }
 
         // Stop monitoring the package if there is no Passpoint profile installed by the package
         if (mAppOpsChangedListenerPerApp.containsKey(packageName)
