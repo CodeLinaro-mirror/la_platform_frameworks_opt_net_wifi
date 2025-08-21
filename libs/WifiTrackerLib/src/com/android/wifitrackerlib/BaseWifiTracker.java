@@ -426,7 +426,8 @@ public class BaseWifiTracker {
         mListener = listener;
         mTag = tag;
 
-        mScanResultUpdater = new ScanResultUpdater(clock, MAX_SCAN_AGE_FOR_FAILED_SCAN_MS);
+        mScanResultUpdater = new ScanResultUpdater(clock,
+                mMaxScanAgeMillis + mScanIntervalMillis);
         if (mEnableScanSingleBand == true) {
             // Create periodic timer to perform background scan on 2.4G Band.
             mScanner = new BaseWifiTracker.Scanner(workerHandler.getLooper(),
