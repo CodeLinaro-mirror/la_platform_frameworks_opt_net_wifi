@@ -266,7 +266,7 @@ public class WifiEntry {
 
     private Optional<ManageSubscriptionAction> mManageSubscriptionAction = Optional.empty();
 
-    private int mDeviceWifiStandard;
+    private int mDeviceWifiStandard = ScanResult.WIFI_STANDARD_UNKNOWN;
     private int mWifiStandard = ScanResult.WIFI_STANDARD_LEGACY;
     private boolean mIsPskSaeTransitionMode;
     private boolean mIsOweTransitionMode;
@@ -282,7 +282,6 @@ public class WifiEntry {
         mCallbackHandler = callbackHandler;
         mForSavedNetworksPage = forSavedNetworksPage;
         mWifiManager = wifiManager;
-        updatetDeviceWifiGenerationInfo();
     }
 
     // Info available for all WifiEntries //
@@ -1391,6 +1390,9 @@ public class WifiEntry {
     }
 
     private void updatetDeviceWifiGenerationInfo() {
+        if (mDeviceWifiStandard != ScanResult.WIFI_STANDARD_UNKNOWN)
+            return;
+
         if (mWifiManager.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
             mDeviceWifiStandard = ScanResult.WIFI_STANDARD_11BE;
         else if (mWifiManager.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11AX))
@@ -1416,8 +1418,10 @@ public class WifiEntry {
 
     protected void updateWifiGenerationInfo(@Nullable List<ScanResult> scanResults) {
         int currResultWifiStandard;
-        int minConnectionCapability = mDeviceWifiStandard;
+        int minConnectionCapability;
 
+        updatetDeviceWifiGenerationInfo();
+        minConnectionCapability = mDeviceWifiStandard;
         // Capture minimum possible connection capability of all scan results
         for (ScanResult result : scanResults) {
             currResultWifiStandard = result.getWifiStandard();
