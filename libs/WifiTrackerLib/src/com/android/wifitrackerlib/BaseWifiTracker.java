@@ -97,10 +97,11 @@ public class BaseWifiTracker {
         return mInjector.isVerboseLoggingEnabled();
     }
 
-    private int mWifiState = WifiManager.WIFI_STATE_DISABLED;
+    private volatile int mWifiState = WifiManager.WIFI_STATE_DISABLED;
 
-    private boolean mIsInitialized = false;
-    private boolean mIsScanningDisabled = false;
+    private volatile boolean mIsInitialized = false;
+    private volatile boolean mIsScanningDisabled = false;
+    private final WifiManager.WifiVerboseLoggingStatusChangedListener mVerboseLoggingListener;
 
     class WifiTrackerLifecycleObserver implements LifecycleObserver {
         @OnLifecycleEvent(Lifecycle.Event.ON_START)
@@ -334,6 +335,8 @@ public class BaseWifiTracker {
             BaseWifiTrackerCallback listener,
             String tag) {
         mInjector = injector;
+        mVerboseLoggingListener =
+                (enabled) -> mInjector.cacheWifiManagerVerboseLoggingValue(enabled);
         mActivityManager = context.getSystemService(ActivityManager.class);
         mContext = context;
         mWifiManager = wifiManager;
@@ -341,7 +344,7 @@ public class BaseWifiTracker {
         mConnectivityDiagnosticsManager =
                 context.getSystemService(ConnectivityDiagnosticsManager.class);
         mPowerManager = context.getSystemService(PowerManager.class);
-        if (mInjector.isSharedConnectivityFeatureEnabled() && BuildCompat.isAtLeastU()) {
+        if (BuildCompat.isAtLeastU()) {
             mSharedConnectivityManager = context.getSystemService(SharedConnectivityManager.class);
             mSharedConnectivityCallback = createSharedConnectivityCallback();
         }
@@ -379,7 +382,7 @@ public class BaseWifiTracker {
         mIsScanningDisabled = true;
         // This method indicates SystemUI usage, which shouldn't output verbose logs since it's
         // always up.
-        mInjector.disableVerboseLogging();
+        mInjector.setVerboseLoggingDisabledByClient();
     }
 
     /**
@@ -406,10 +409,11 @@ public class BaseWifiTracker {
                     && mInjector.isWifiStateChangedListenerEnabled() && mInjector.isAtLeastB()) {
                 mWifiManager.addWifiStateChangedListener((c) -> mWorkerHandler.post(c),
                         mWifiStateChangedListener);
-                mWifiStateChangedListener.onWifiStateChanged();
             } else {
                 filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
             }
+            mWifiManager.addWifiVerboseLoggingStatusChangedListener(
+                    mWorkerHandler::post, mVerboseLoggingListener);
             if (!mIsScanningDisabled) {
                 filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
             }
@@ -455,6 +459,7 @@ public class BaseWifiTracker {
                         && mInjector.isAtLeastB()) {
                     mWifiManager.removeWifiStateChangedListener(mWifiStateChangedListener);
                 }
+                mWifiManager.removeWifiVerboseLoggingStatusChangedListener(mVerboseLoggingListener);
                 mContext.unregisterReceiver(mBroadcastReceiver);
                 mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
                 mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
@@ -488,6 +493,7 @@ public class BaseWifiTracker {
                     && mInjector.isAtLeastB()) {
                 mWifiManager.removeWifiStateChangedListener(mWifiStateChangedListener);
             }
+            mWifiManager.removeWifiVerboseLoggingStatusChangedListener(mVerboseLoggingListener);
             mContext.unregisterReceiver(mBroadcastReceiver);
             mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
             mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
@@ -720,8 +726,8 @@ public class BaseWifiTracker {
      * Scanning is only done when the activity is in the Started state and Wi-Fi is enabled.
      */
     private class Scanner extends Handler {
-        private boolean mIsStartedState = false;
-        private boolean mIsWifiEnabled = false;
+        private volatile boolean mIsStartedState = false;
+        private volatile boolean mIsWifiEnabled = false;
         private final WifiScanner.ScanListener mFirstScanListener = new WifiScanner.ScanListener() {
             @Override
             @MainThread
@@ -894,7 +900,11 @@ public class BaseWifiTracker {
             }
             // Remove any pending scanLoops in case possiblyStartScanning was called more than once.
             removeCallbacksAndMessages(null);
-            mWifiManager.startScan();
+            try {
+                mWifiManager.startScan();
+            } catch (SecurityException e) {
+                Log.e(mTag, "Received SecurityException while trying to start scan", e);
+            }
             notifyOnScanRequested();
             postDelayed(this::scanLoop, mScanIntervalMillis);
         }

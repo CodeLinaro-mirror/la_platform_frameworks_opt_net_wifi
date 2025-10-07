@@ -78,6 +78,8 @@ import android.os.Handler;
 import android.os.PowerManager;
 import android.os.test.TestLooper;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.ArrayMap;
@@ -90,6 +92,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -109,6 +112,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class WifiPickerTrackerTest {
+
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
     private static final long START_MILLIS = 123_456_789;
 
@@ -245,13 +251,12 @@ public class WifiPickerTrackerTest {
         when(mMockContext.getSystemService(SharedConnectivityManager.class))
                 .thenReturn(mMockSharedConnectivityManager);
         when(mMockContext.getString(anyInt())).thenReturn("");
-        when(mInjector.isSharedConnectivityFeatureEnabled()).thenReturn(true);
         when(mMockResources.getStringArray(R.array.wifitrackerlib_wifi_status)).thenReturn(
                 new String[]{"", "Scanning", "Connecting", "Authenticating", "Obtaining IP address",
                         "Connected", "Suspended", "Disconnecting", "Unsuccessful", "Blocked",
                         "Temporarily avoiding poor connection"});
-        when(mInjector.isSharedConnectivityFeatureEnabled()).thenReturn(true);
         when(mInjector.getConnectivityManager()).thenReturn(mMockConnectivityManager);
+        when(mInjector.getClock()).thenReturn(mMockClock);
         when(mInjector.isWifiStateChangedListenerEnabled()).thenReturn(false);
         when(mInjector.isAtLeastB()).thenReturn(false);
     }
@@ -323,16 +328,13 @@ public class WifiPickerTrackerTest {
         ArgumentCaptor<WifiStateChangedListener> captor =
                 ArgumentCaptor.forClass(WifiStateChangedListener.class);
         verify(mMockWifiManager).addWifiStateChangedListener(any(), captor.capture());
-        // Wifi state should be updated by onStart().
-        verify(mMockCallback).onWifiStateChanged();
-        assertThat(wifiPickerTracker.getWifiState()).isEqualTo(WifiManager.WIFI_STATE_ENABLED);
 
         // Set the wifi state to disabled
         when(mMockWifiManager.getWifiState()).thenReturn(WifiManager.WIFI_STATE_DISABLED);
         captor.getValue().onWifiStateChanged();
         mTestLooper.dispatchAll();
 
-        verify(mMockCallback, times(2)).onWifiStateChanged();
+        verify(mMockCallback, times(1)).onWifiStateChanged();
         assertThat(wifiPickerTracker.getWifiState()).isEqualTo(WifiManager.WIFI_STATE_DISABLED);
 
         // Change the wifi state to enabled
@@ -340,7 +342,7 @@ public class WifiPickerTrackerTest {
         captor.getValue().onWifiStateChanged();
         mTestLooper.dispatchAll();
 
-        verify(mMockCallback, times(3)).onWifiStateChanged();
+        verify(mMockCallback, times(2)).onWifiStateChanged();
         assertThat(wifiPickerTracker.getWifiState()).isEqualTo(WifiManager.WIFI_STATE_ENABLED);
     }
 
@@ -355,12 +357,15 @@ public class WifiPickerTrackerTest {
         mTestLooper.dispatchAll();
         verify(mMockContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
                 any(), any(), any());
+        verify(mMockWifiManager, times(1)).getScanResults();
 
         mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
                 new Intent(WifiManager.CONFIGURED_NETWORKS_CHANGED_ACTION));
         mTestLooper.dispatchAll();
 
         verify(mMockCallback, atLeastOnce()).onNumSavedNetworksChanged();
+        // Scans should only be polled once, after onStart
+        verify(mMockWifiManager, times(1)).getScanResults();
     }
 
     /**
@@ -495,6 +500,7 @@ public class WifiPickerTrackerTest {
                 buildScanResult("ssid4", "bssid4", START_MILLIS)));
         mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
                 new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        verify(mMockWifiManager, times(2)).getScanResults();
         final List<WifiEntry> previousEntries = wifiPickerTracker.getWifiEntries();
 
         // Advance the clock to time out old entries and simulate failed scan
@@ -503,8 +509,10 @@ public class WifiPickerTrackerTest {
                 new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
                         .putExtra(WifiManager.EXTRA_RESULTS_UPDATED, false));
 
-        // Failed scan should result in old WifiEntries still being shown
+        // Failed scan should result in old WifiEntries still being shown, and we should not be
+        // querying the scan results from WifiManager again.
         assertThat(previousEntries).containsExactlyElementsIn(wifiPickerTracker.getWifiEntries());
+        verify(mMockWifiManager, times(2)).getScanResults();
 
         mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
                 new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
@@ -564,8 +572,7 @@ public class WifiPickerTrackerTest {
 
         assertThat(entry.isSaved()).isFalse();
 
-        final WifiConfiguration config = new WifiConfiguration();
-        config.SSID = "\"ssid\"";
+        final WifiConfiguration config = buildWifiConfiguration("ssid");
         when(mMockWifiManager.getPrivilegedConfiguredNetworks())
                 .thenReturn(Collections.singletonList(config));
         mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
@@ -2234,6 +2241,7 @@ public class WifiPickerTrackerTest {
         wifiPickerTracker.onStart();
         mTestLooper.dispatchAll();
         // Entry should be disconnected.
+        assertThat(wifiPickerTracker.getConnectedWifiEntry()).isNull();
         assertThat(entry.getConnectedState()).isEqualTo(CONNECTED_STATE_DISCONNECTED);
     }
 
@@ -2846,7 +2854,7 @@ public class WifiPickerTrackerTest {
                 ArgumentCaptor.forClass(WifiScanner.ScanListener.class);
         verify(mWifiScanner, never()).startScan(any(), mScanListenerCaptor.capture());
         verify(mMockWifiManager, never()).startScan();
-        verify(mInjector).disableVerboseLogging();
+        verify(mInjector).setVerboseLoggingDisabledByClient();
     }
 
     /**
@@ -3202,6 +3210,21 @@ public class WifiPickerTrackerTest {
 
         assertThat(wifiPickerTracker.getWifiEntries().stream().filter(
                 entry -> entry instanceof KnownNetworkEntry).toList()).isEmpty();
+    }
+
+    @Test
+    public void testNoSharedConnectivityServiceConfigured() {
+        when(mMockContext.getSystemService(SharedConnectivityManager.class)).thenReturn(null);
+        when(mMockWifiManager.getScanResults())
+                .thenReturn(
+                        Collections.singletonList(
+                                buildScanResult("ssid", "bssid", START_MILLIS, "[PSK/SAE]")));
+
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+
+        assertThat(wifiPickerTracker.getWifiEntries()).hasSize(1);
     }
 
     @Test
@@ -3615,5 +3638,20 @@ public class WifiPickerTrackerTest {
                 entry -> entry instanceof HotspotNetworkEntry).toList()).hasSize(1);
         assertThat(wifiPickerTracker.getActiveWifiEntries().stream().filter(
                 entry -> entry instanceof HotspotNetworkEntry).toList()).isEmpty();
+    }
+
+    @Test
+    public void testVerboseLoggingChangeUpdatesInjectorValue() {
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+        ArgumentCaptor<WifiManager.WifiVerboseLoggingStatusChangedListener> verboseListener =
+                ArgumentCaptor.forClass(WifiManager.WifiVerboseLoggingStatusChangedListener.class);
+        verify(mMockWifiManager).addWifiVerboseLoggingStatusChangedListener(
+                any(), verboseListener.capture());
+
+        verboseListener.getValue().onWifiVerboseLoggingStatusChanged(true);
+
+        verify(mInjector).cacheWifiManagerVerboseLoggingValue(true);
     }
 }
