@@ -25,8 +25,10 @@
 #include <sys/system_properties.h>
 #include <unistd.h>
 
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
 #include "wifi_fst.h"
 
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
 namespace android {
 namespace wifi_system {
 namespace {
@@ -42,10 +44,12 @@ bool SupplicantManager::StartSupplicant() {
   const prop_info* pi;
   unsigned serial = 0;
 
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   if (wifi_start_fstman(0)) {
     return -1;
   }
 
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   /* Check whether already running */
   if (property_get(kSupplicantInitProperty, supp_status, NULL) &&
       strcmp(supp_status, "running") == 0) {
@@ -81,14 +85,18 @@ bool SupplicantManager::StartSupplicant() {
         if (strcmp(supp_status, "running") == 0) {
           return true;
         } else if (strcmp(supp_status, "stopped") == 0) {
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
           wifi_stop_fstman(0);
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
           return false;
         }
       }
     }
     usleep(100000);
   }
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   wifi_stop_fstman(0);
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   return false;
 }
 
@@ -99,7 +107,9 @@ bool SupplicantManager::StopSupplicant() {
   /* Check whether supplicant already stopped */
   if (property_get(kSupplicantInitProperty, supp_status, NULL) &&
       strcmp(supp_status, "stopped") == 0) {
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
     wifi_stop_fstman(0);
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
     return true;
   }
 
@@ -108,15 +118,19 @@ bool SupplicantManager::StopSupplicant() {
 
   while (count-- > 0) {
     if (property_get(kSupplicantInitProperty, supp_status, NULL)) {
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
       if (strcmp(supp_status, "stopped") == 0) {
         wifi_stop_fstman(0);
         return true;
       }
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
     }
     usleep(100000);
   }
   LOG(ERROR) << "Failed to stop supplicant";
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   wifi_stop_fstman(0);
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
   return false;
 }
 
