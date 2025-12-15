@@ -46,7 +46,9 @@ cc_library {
     srcs: [
         "hostapd_manager.cpp",
         "supplicant_manager.cpp",
+// QTI_BEGIN: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
         "wifi_fst.cpp",
+// QTI_END: 2018-06-08: WIGIG: frameworks/opt/net/wifi: add support for Fast Session Transfer (FST)
     ],
 }
 
