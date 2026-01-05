@@ -293,15 +293,9 @@ public class Utils {
         }
 
         if (!TextUtils.isEmpty(suggestionOrSpecifierLabel)) {
-            if (shouldShowConnected || (isDefaultNetwork && isPartialConnectivity)) {
-                // "Connected via app"
-                sj.add(context.getString(R.string.wifitrackerlib_connected_via_app,
-                        suggestionOrSpecifierLabel));
-            } else {
-                // "Available via app"
-                sj.add(context.getString(R.string.wifitrackerlib_available_via_app,
-                        suggestionOrSpecifierLabel));
-            }
+            // "Connected via app"
+            sj.add(context.getString(R.string.wifitrackerlib_connected_via_app,
+                    suggestionOrSpecifierLabel));
         } else if (shouldShowConnected) {
             // "Connected"
             sj.add(context.getResources().getStringArray(
@@ -1256,6 +1250,51 @@ public class Utils {
                     bandToBandString(context, link.getBand())));
         }
         return sj.toString();
+    }
+
+    /**
+     * Returns the max supported link speed string of the WifiInfo for Tx if isTx is {@code true},
+     * else return the Rx link speed. If using MLO, the max supported link speed for each individual
+     * link will be included. If the speed is invalid or zero, then an empty string is returned.
+     */
+    public static String getMaxSupportedLinkSpeedString(
+            @NonNull Context context, @Nullable WifiInfo wifiInfo, boolean isTx) {
+        if (wifiInfo == null) {
+            return "";
+        }
+
+        // If using MLO, show each individual link's max speed.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN
+                && NonSdkApiWrapper.isMloLinkSpeedApiEnabled()
+                && wifiInfo.getAssociatedMloLinks().size() > 1) {
+            StringJoiner sj = new StringJoiner(context.getString(
+                    R.string.wifitrackerlib_multiband_separator));
+            for (MloLink link : wifiInfo.getAssociatedMloLinks()) {
+                int linkSpeed = isTx
+                        ? link.getMaxSupportedTxLinkSpeedMbps()
+                        : link.getMaxSupportedRxLinkSpeedMbps();
+                if (linkSpeed <= 0) {
+                    continue;
+                }
+                sj.add(context.getString(
+                        R.string.wifitrackerlib_link_speed_on_band,
+                        context.getString(
+                                R.string.wifitrackerlib_link_speed_mbps, linkSpeed),
+                        bandToBandString(context, link.getBand())));
+            }
+            if (sj.length() > 0) {
+                return sj.toString();
+            }
+        }
+
+        int maxSupportedLinkSpeed = isTx
+                ? wifiInfo.getMaxSupportedTxLinkSpeedMbps()
+                : wifiInfo.getMaxSupportedRxLinkSpeedMbps();
+        if (maxSupportedLinkSpeed <= 0) {
+            return "";
+        }
+        return context.getString(
+                R.string.wifitrackerlib_link_speed_mbps, maxSupportedLinkSpeed);
     }
 
     /**
