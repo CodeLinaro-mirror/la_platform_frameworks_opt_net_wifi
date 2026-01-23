@@ -813,7 +813,9 @@ public class StandardWifiEntry extends WifiEntry {
         // Update the level using the scans matching the target security type
         final ScanResult bestScanResult = getBestScanResultByLevel(mTargetScanResults);
         if (bestScanResult != null) {
+// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             updateTransitionModeCapa(bestScanResult);
+// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         }
 
         if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
