@@ -160,6 +160,12 @@ public class StandardNetworkDetailsTracker extends NetworkDetailsTracker {
         }
     }
 
+    @Override
+    @WorkerThread
+    protected List<WifiEntry> getAllWifiEntries() {
+        return Collections.singletonList(mChosenEntry);
+    }
+
     /**
      * Updates the tracked entry's scan results up to the max scan age (or more, if the last scan
      * was unsuccessful). If Wifi is disabled, the tracked entry's level will be cleared.
@@ -193,6 +199,6 @@ public class StandardNetworkDetailsTracker extends NetworkDetailsTracker {
         if (config.isPasspoint()) {
             return false;
         }
-        return mKey.equals(new StandardWifiEntryKey(config, mKey.isTargetingNewNetworks()));
+        return mKey.equals(new StandardWifiEntryKey(config, mKey.shouldUseScanFallback()));
     }
 }

@@ -52,6 +52,7 @@ import android.os.Handler;
 import android.os.test.TestLooper;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.security.advancedprotection.AdvancedProtectionManager;
 
 import androidx.core.os.BuildCompat;
 
@@ -66,6 +67,8 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.MockitoSession;
 import org.mockito.quality.Strictness;
 
+import java.time.Clock;
+
 public class HotspotNetworkEntryTest {
     @Rule
     public final CheckFlagsRule mCheckFlagsRule =
@@ -77,6 +80,7 @@ public class HotspotNetworkEntryTest {
     @Mock private WifiEntry.ConnectCallback mMockConnectCallback;
     @Mock private WifiEntry.DisconnectCallback mMockDisconnectCallback;
     @Mock private WifiTrackerInjector mMockInjector;
+    @Mock private Clock mMockClock;
     @Mock private Context mMockContext;
     @Mock private Resources mMockResources;
     @Mock private WifiManager mMockWifiManager;
@@ -84,6 +88,7 @@ public class HotspotNetworkEntryTest {
     @Mock private WifiInfo mMockWifiInfo;
     @Mock private Network mMockNetwork;
     @Mock private NetworkCapabilities mMockNetworkCapabilities;
+    @Mock private AdvancedProtectionManager mAdvancedProtectionManager;
 
     private TestLooper mTestLooper;
     private Handler mTestHandler;
@@ -114,6 +119,7 @@ public class HotspotNetworkEntryTest {
         mTestLooper = new TestLooper();
         mTestHandler = new Handler(mTestLooper.getLooper());
 
+        when(mMockInjector.getClock()).thenReturn(mMockClock);
         when(mMockNetworkCapabilities.getTransportInfo()).thenReturn(mMockWifiInfo);
         when(mMockWifiInfo.isPrimary()).thenReturn(true);
         when(mMockWifiInfo.getSSID()).thenReturn("Instant Hotspot abcde");
@@ -175,6 +181,11 @@ public class HotspotNetworkEntryTest {
                 "2.4 GHz");
         when(mMockResources.getString(R.string.wifitrackerlib_multiband_separator)).thenReturn(
                 ", ");
+
+        when(mMockInjector.getContext()).thenReturn(mMockContext);
+        when(mMockContext.getSystemService(AdvancedProtectionManager.class))
+                .thenReturn(mAdvancedProtectionManager);
+        when(mAdvancedProtectionManager.isAdvancedProtectionEnabled()).thenReturn(false);
     }
 
     @After

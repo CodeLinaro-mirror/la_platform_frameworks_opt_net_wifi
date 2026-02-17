@@ -38,7 +38,9 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Handler;
+import android.security.Flags;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -47,6 +49,7 @@ import androidx.annotation.IntDef;
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 import androidx.core.os.BuildCompat;
 
@@ -77,6 +80,9 @@ public class WifiEntry {
     public static final String TAG = "WifiEntry";
 
     private static final int MAX_UNDERLYING_NETWORK_DEPTH = 5;
+
+    @VisibleForTesting
+    static final long LAST_CONNECTED_SIGNAL_LEVEL_TIMEOUT_MS = 25_000;
 
     /**
      * Security type based on WifiConfiguration.KeyMgmt
@@ -248,6 +254,8 @@ public class WifiEntry {
     protected final Handler mCallbackHandler;
     protected int mWifiInfoLevel = WIFI_LEVEL_UNREACHABLE;
     protected int mScanResultLevel = WIFI_LEVEL_UNREACHABLE;
+    private int mLastConnectedSignalLevel = WIFI_LEVEL_UNREACHABLE;
+    private long mDisconnectTimestampMillis = -1;
     protected WifiInfo mWifiInfo;
     protected NetworkInfo mNetworkInfo;
     protected Network mNetwork;
@@ -264,6 +272,8 @@ public class WifiEntry {
 
     protected boolean mCalledConnect = false;
     protected boolean mCalledDisconnect = false;
+
+    protected boolean mIsAapmEnabled = false;
 
 
     private Optional<ManageSubscriptionAction> mManageSubscriptionAction = Optional.empty();
@@ -286,6 +296,12 @@ public class WifiEntry {
         mCallbackHandler = callbackHandler;
         mForSavedNetworksPage = forSavedNetworksPage;
         mWifiManager = wifiManager;
+
+        // TODO(b/477286489): Update to Build.VERSION.SDK_INT > Build.VERSION_CODES.BAKLAVA
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+                && Flags.aapmFeatureDisableInsecureWifiAutojoin()) {
+            mIsAapmEnabled = mInjector.isAapmEnabled();
+        }
     }
 
     // Info available for all WifiEntries //
@@ -355,10 +371,16 @@ public class WifiEntry {
      * A value of WIFI_LEVEL_UNREACHABLE indicates an out of range network.
      */
     public int getLevel() {
-        if (mWifiInfoLevel != WIFI_LEVEL_UNREACHABLE) {
-            return mWifiInfoLevel;
+        if (mWifiInfoLevel != WIFI_LEVEL_UNREACHABLE) return mWifiInfoLevel;
+        if (mScanResultLevel != WIFI_LEVEL_UNREACHABLE) return mScanResultLevel;
+
+        // Fall back to the last connected signal level in case we don't have any scan results.
+        if (mInjector.getClock().millis()
+                <= mDisconnectTimestampMillis + LAST_CONNECTED_SIGNAL_LEVEL_TIMEOUT_MS) {
+            return mLastConnectedSignalLevel;
         }
-        return mScanResultLevel;
+
+        return WIFI_LEVEL_UNREACHABLE;
     };
 
     /**
@@ -1172,6 +1194,8 @@ public class WifiEntry {
      */
     synchronized void onNetworkLost(@NonNull Network network) {
         if (network.equals(mNetwork)) {
+            mLastConnectedSignalLevel = mWifiInfoLevel;
+            mDisconnectTimestampMillis = mInjector.getClock().millis();
             clearConnectionInfo(true);
         } else if (network.equals(mLastNetwork)) {
             mLastNetwork = null;
@@ -1438,6 +1462,17 @@ public class WifiEntry {
      */
     public boolean isVerboseSummaryEnabled() {
         return mInjector.isVerboseSummaryEnabled();
+    }
+
+    /**
+     * Updates the Advanced Protection Mode state.
+     * Triggers a listener update if the state changes to refresh the UI.
+     */
+    public synchronized void updateAapmState(boolean isEnabled) {
+        if (mIsAapmEnabled != isEnabled) {
+            mIsAapmEnabled = isEnabled;
+            notifyOnUpdated();
+        }
     }
 
 // QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
