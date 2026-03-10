@@ -82,7 +82,7 @@ public class WifiEntry {
 
     private static final int MAX_UNDERLYING_NETWORK_DEPTH = 5;
 
-    private static final Collator COLLATOR = Collator.getInstance();
+    private static final Collator COLLATOR = Collator.getInstance().freeze();
 
 
     @VisibleForTesting
@@ -239,7 +239,8 @@ public class WifiEntry {
                     .thenComparing((WifiEntry entry) -> !entry.isSaved())
                     .thenComparing((WifiEntry entry) -> !entry.isSuggestion())
                     .thenComparing((WifiEntry entry) -> -entry.getLevel())
-                    .thenComparing(WifiEntry::getTitle, COLLATOR);
+                    .thenComparing(WifiEntry::getTitle, COLLATOR)
+                    .thenComparing(WifiEntry::isSharedWithOtherUsers);
 
     /**
      * Default comparator for sorting WifiEntries by title.
@@ -1423,6 +1424,9 @@ public class WifiEntry {
         }
         if (isSaved()) {
             sj.add("Saved");
+        }
+        if (isSharedWithOtherUsers()) {
+            sj.add("Shared");
         }
         if (isSubscription()) {
             sj.add("Subscription");
