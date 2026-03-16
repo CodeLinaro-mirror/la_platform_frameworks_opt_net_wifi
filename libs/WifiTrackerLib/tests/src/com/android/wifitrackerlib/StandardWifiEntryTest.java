@@ -2348,7 +2348,10 @@ public class StandardWifiEntryTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN)
+    @DisableFlags({
+            Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN,
+            Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN_V2
+    })
     public void testIsAutoJoinEnabled_flagDisabled_returnsConfigAllowAutojoin() {
         // Setup a config where allowAutojoin is true
         WifiConfiguration config = spy(new WifiConfiguration());
@@ -2373,7 +2376,7 @@ public class StandardWifiEntryTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN)
+    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN_V2)
     public void testIsAutoJoinEnabled_flagEnabled_aapmOff_returnsConfigAllowAutojoin() {
         WifiConfiguration config = spy(new WifiConfiguration());
         config.SSID = "\"ssid\"";
@@ -2396,7 +2399,7 @@ public class StandardWifiEntryTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN)
+    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN_V2)
     public void testIsAutoJoinEnabled_flagEnabled_aapmOn_restrictedConfig_returnsFalse() {
         WifiConfiguration config = spy(new WifiConfiguration());
         config.SSID = "\"ssid\"";
@@ -2419,7 +2422,7 @@ public class StandardWifiEntryTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN)
+    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN_V2)
     public void testIsAutoJoinEnabled_flagEnabled_aapmOn_allowedConfig_returnsTrue() {
         WifiConfiguration config = spy(new WifiConfiguration());
         config.SSID = "\"ssid\"";
@@ -2439,6 +2442,30 @@ public class StandardWifiEntryTest {
 
         // Should return true
         assertThat(entry.isAutoJoinEnabled()).isTrue();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_AAPM_FEATURE_DISABLE_INSECURE_WIFI_AUTOJOIN)
+    public void testIsAutoJoinEnabled_aapmOn_allowedByAapmButDisabledByUser_returnsFalse() {
+        WifiConfiguration config = spy(new WifiConfiguration());
+        config.SSID = "\"ssid\"";
+        config.networkId = 1;
+        // User/System has disabled autojoin for this network
+        config.allowAutojoin = false;
+
+        // AAPM logic says this network is secure enough to autojoin
+        doReturn(true).when(config).isAutoJoinInAdvancedProtectionModeEnabled();
+
+        StandardWifiEntry entry = new StandardWifiEntry(
+                mMockInjector, mTestHandler,
+                new StandardWifiEntryKey(config), Collections.singletonList(config), null,
+                mMockWifiManager, false /* forSavedNetworksPage */);
+
+        // Enable AAPM state on the entry
+        entry.updateAapmState(true);
+
+        // Should return false
+        assertThat(entry.isAutoJoinEnabled()).isFalse();
     }
 
     /**
