@@ -625,10 +625,10 @@ public class StandardWifiEntry extends WifiEntry {
     public synchronized boolean isAutoJoinEnabled() {
         if (mTargetWifiConfig == null) return false;
 
-        if (Flags.aapmFeatureDisableInsecureWifiAutojoin()
-                && mIsAapmEnabled
-                && !mTargetWifiConfig.isAutoJoinInAdvancedProtectionModeEnabled()) {
-            return false;
+        if (Flags.aapmFeatureDisableInsecureWifiAutojoin()) {
+            if (mIsAapmEnabled) {
+                return mTargetWifiConfig.isAutoJoinInAdvancedProtectionModeEnabled();
+            }
         }
 
         return mTargetWifiConfig.allowAutojoin;
