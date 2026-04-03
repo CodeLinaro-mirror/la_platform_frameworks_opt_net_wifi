@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sched.h>
 
 #include <android-base/logging.h>
 #define LOG_TAG "WifiFST"
