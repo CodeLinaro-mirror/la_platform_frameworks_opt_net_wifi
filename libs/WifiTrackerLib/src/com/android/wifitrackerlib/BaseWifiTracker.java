@@ -209,14 +209,16 @@ public class BaseWifiTracker {
         @Override
         public void onConnectedClientsChanged(@NonNull SoftApInfo info,
              @NonNull List<WifiClient> clients) {
-             if (!clients.isEmpty()) {
-                 mSoftApBandsInUse |= freqToBand(info.getFrequency());
-             } else {
-                 mSoftApBandsInUse &= ~freqToBand(info.getFrequency());
-             }
-             if (isVerboseLoggingEnabled()) {
-                 Log.v(mTag, "mSoftApBandsInUse:" + mSoftApBandsInUse);
-             }
+             mWorkerHandler.post(() -> {
+                 if (!clients.isEmpty()) {
+                     mSoftApBandsInUse |= freqToBand(info.getFrequency());
+                 } else {
+                     mSoftApBandsInUse &= ~freqToBand(info.getFrequency());
+                 }
+                 if (isVerboseLoggingEnabled()) {
+                     Log.v(mTag, "mSoftApBandsInUse:" + mSoftApBandsInUse);
+                 }
+             });
         }
     };
     private final BaseWifiTracker.Scanner mScanner;
@@ -564,11 +566,10 @@ public class BaseWifiTracker {
     /**
      * Returns the bands use by primary STA and AP(softap or LOHS)
      */
-    @AnyThread
+    @WorkerThread
     public int getBandsInUse() {
         return (mPriStaBandsInUse | mSoftApBandsInUse);
     }
-
 
     /**
      * Returns the LifecycleObserver to listen on the app's lifecycle state.
@@ -1063,6 +1064,7 @@ public class BaseWifiTracker {
         // If the scanning band has a critical connection, then schedule next scan with
         // configured interval. If scanning band has no critical connection, then schedule
         // next scan with default interval(10s).
+        @WorkerThread
         private long getRealScanIntervalMillis() {
             if (mEnableScanSingleBand && (mScanBands & getBandsInUse()) != 0
                     && mScanIntervalMs != 0) {
@@ -1074,6 +1076,7 @@ public class BaseWifiTracker {
 
         // When configured interval is 0, skip scan if critical connection exists otherwise
         // perform scan with default interval(10s).
+        @WorkerThread
         private boolean shouldSkipScan() {
             if (mEnableScanSingleBand && (mScanBands & getBandsInUse()) != 0
                     && mScanIntervalMs == 0) {
