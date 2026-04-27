@@ -33,9 +33,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.RouteInfo;
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
 import android.net.wifi.ScanResult;
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -283,12 +281,10 @@ public class WifiEntry {
     private Optional<ManageSubscriptionAction> mManageSubscriptionAction = Optional.empty();
 
     private int mDeviceWifiStandard = ScanResult.WIFI_STANDARD_UNKNOWN;
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
     private int mWifiStandard = ScanResult.WIFI_STANDARD_LEGACY;
     private boolean mIsPskSaeTransitionMode;
     private boolean mIsOweTransitionMode;
 
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
     public WifiEntry(@NonNull WifiTrackerInjector injector, @NonNull Handler callbackHandler,
             @NonNull WifiManager wifiManager, boolean forSavedNetworksPage)
             throws IllegalArgumentException {
@@ -1479,7 +1475,6 @@ public class WifiEntry {
         }
     }
 
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
     protected void updateTransitionModeCapa(ScanResult scanResult) {
         mIsPskSaeTransitionMode = scanResult.capabilities.contains("PSK")
                                       && scanResult.capabilities.contains("SAE");
@@ -1495,16 +1490,12 @@ public class WifiEntry {
     }
 
     private void updatetDeviceWifiGenerationInfo() {
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         if (mDeviceWifiStandard != ScanResult.WIFI_STANDARD_UNKNOWN)
             return;
 
-// QTI_BEGIN: 2023-03-28: WLAN: Wifi: Add wifi standard for 11Be
         if (mWifiManager.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
             mDeviceWifiStandard = ScanResult.WIFI_STANDARD_11BE;
         else if (mWifiManager.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11AX))
-// QTI_END: 2023-03-28: WLAN: Wifi: Add wifi standard for 11Be
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             mDeviceWifiStandard = ScanResult.WIFI_STANDARD_11AX;
         else if (mWifiManager.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11AC))
             mDeviceWifiStandard = ScanResult.WIFI_STANDARD_11AC;
@@ -1517,11 +1508,7 @@ public class WifiEntry {
     /**
      * Returns Wi-Fi standard of the connection/AP
      */
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
-// QTI_BEGIN: 2024-04-26: WLAN: wifi: Making getWifiStandard synchronized in WifiEntry.
     public synchronized int getWifiStandard() {
-// QTI_END: 2024-04-26: WLAN: wifi: Making getWifiStandard synchronized in WifiEntry.
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         if (getConnectedInfo() == null || mWifiInfo == null ||
                 getConnectedState() != CONNECTED_STATE_CONNECTED)
             return mWifiStandard;
@@ -1531,33 +1518,24 @@ public class WifiEntry {
 
     protected void updateWifiGenerationInfo(@Nullable List<ScanResult> scanResults) {
         int currResultWifiStandard;
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         int minConnectionCapability;
 
         updatetDeviceWifiGenerationInfo();
         minConnectionCapability = mDeviceWifiStandard;
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         // Capture minimum possible connection capability of all scan results
         for (ScanResult result : scanResults) {
             currResultWifiStandard = result.getWifiStandard();
 
             if (currResultWifiStandard < minConnectionCapability)
                 minConnectionCapability = currResultWifiStandard;
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
-// QTI_BEGIN: 2021-10-05: WLAN: Update Wifi standard based on band and mode capability.
             /*Do not include VHT support for 2ghz when device capability is 11AC
               and AP operating in 11AX */
-// QTI_END: 2021-10-05: WLAN: Update Wifi standard based on band and mode capability.
             else if (result.getBand() == ScanResult.WIFI_BAND_24_GHZ &&
                      currResultWifiStandard == ScanResult.WIFI_STANDARD_11AX &&
-// QTI_BEGIN: 2021-10-05: WLAN: Update Wifi standard based on band and mode capability.
                      minConnectionCapability == ScanResult.WIFI_STANDARD_11AC)
                 minConnectionCapability = ScanResult.WIFI_STANDARD_11N;
-// QTI_END: 2021-10-05: WLAN: Update Wifi standard based on band and mode capability.
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         }
 
         mWifiStandard = minConnectionCapability;
     }
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
 }
