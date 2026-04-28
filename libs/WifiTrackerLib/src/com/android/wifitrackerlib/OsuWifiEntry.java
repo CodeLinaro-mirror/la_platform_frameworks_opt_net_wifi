@@ -163,9 +163,7 @@ class OsuWifiEntry extends WifiEntry {
 
         final ScanResult bestScanResult = getBestScanResultByLevel(scanResults);
         if (bestScanResult != null) {
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             updateTransitionModeCapa(bestScanResult);
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             mSsid = bestScanResult.SSID;
             if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
                 mScanResultLevel = mWifiManager.calculateSignalLevel(bestScanResult.level);
@@ -173,9 +171,7 @@ class OsuWifiEntry extends WifiEntry {
         } else {
             mScanResultLevel = WIFI_LEVEL_UNREACHABLE;
         }
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         updateWifiGenerationInfo(mCurrentScanResults);
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
         notifyOnUpdated();
     }
 
