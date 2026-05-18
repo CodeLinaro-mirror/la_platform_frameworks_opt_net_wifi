@@ -531,21 +531,15 @@ public class PasspointWifiEntry extends WifiEntry implements WifiEntry.WifiEntry
             List<ScanResult> currentScanResults = new ArrayList<>();
             if (homeScanResults != null && !homeScanResults.isEmpty()) {
                 currentScanResults.addAll(homeScanResults);
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
                 updateWifiGenerationInfo(homeScanResults);
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             } else if (roamingScanResults != null && !roamingScanResults.isEmpty()) {
                 currentScanResults.addAll(roamingScanResults);
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
                 updateWifiGenerationInfo(roamingScanResults);
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             }
             ScanResult bestScanResult = getBestScanResultByLevel(currentScanResults);
             if (bestScanResult != null) {
                 mWifiConfig.SSID = "\"" + bestScanResult.SSID + "\"";
-// QTI_BEGIN: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
                 updateTransitionModeCapa(bestScanResult);
-// QTI_END: 2020-04-22: WLAN: Refactor Wi-Fi generation UI enhancements
             }
             if (getConnectedState() == CONNECTED_STATE_DISCONNECTED) {
                 mScanResultLevel = bestScanResult != null
