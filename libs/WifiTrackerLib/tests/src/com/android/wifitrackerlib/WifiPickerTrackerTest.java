@@ -2829,11 +2829,15 @@ public class WifiPickerTrackerTest {
     }
 
     /**
-     * Tests that the BaseWifiTracker.Scanner continues scanning with WifiManager.startScan() after
-     * the first WifiScanner scan fails.
+     * Tests that the BaseWifiTracker.Scanner does NOT fall back to WifiManager.startScan() when
+     * the first WifiScanner scan fails and a connection attempt is in progress. Issuing another
+     * scan while the driver is busy with a connection causes back-to-back scan failures.
+     * The periodic scan loop will resume once the connection completes.
+     *
+     * Expected behavior: WifiManager.startScan() is never called.
      */
     @Test
-    public void testScanner_wifiScannerFailed_scannerContinues() {
+    public void testScanner_wifiScannerFailed_connectionInProgress_scannerSkipsRetry() {
         final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
         wifiPickerTracker.onStart();
         mTestLooper.dispatchAll();
@@ -2843,15 +2847,50 @@ public class WifiPickerTrackerTest {
                 new Intent(WifiManager.WIFI_STATE_CHANGED_ACTION).putExtra(
                         WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_ENABLED));
 
+        // Simulate a connection in progress.
+        when(mMockWifiInfo.getSupplicantState()).thenReturn(SupplicantState.ASSOCIATING);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(mMockWifiInfo);
+
         ArgumentCaptor<WifiScanner.ScanListener> mScanListenerCaptor =
                 ArgumentCaptor.forClass(WifiScanner.ScanListener.class);
         verify(mWifiScanner).startScan(any(), mScanListenerCaptor.capture());
-        mTestLooper.moveTimeForward(SCAN_INTERVAL_MILLIS);
-        mTestLooper.dispatchAll();
-        verify(mMockWifiManager, never()).startScan();
 
-        mScanListenerCaptor.getValue().onFailure(0, "Reason");
+        mScanListenerCaptor.getValue().onFailure(WifiScanner.REASON_ABORT, "Scan aborted");
         mTestLooper.dispatchAll();
+
+        // Retry via WifiManager.startScan() must be suppressed.
+        verify(mMockWifiManager, never()).startScan();
+    }
+
+    /**
+     * Tests that the BaseWifiTracker.Scanner falls back to WifiManager.startScan() when the
+     * first WifiScanner scan fails and no connection is in progress.
+     *
+     * Expected behavior: WifiManager.startScan() is called once.
+     */
+    @Test
+    public void testScanner_wifiScannerFailed_noConnectionInProgress_scannerContinues() {
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+        verify(mMockContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                any(), any(), any());
+        mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
+                new Intent(WifiManager.WIFI_STATE_CHANGED_ACTION).putExtra(
+                        WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_ENABLED));
+
+        // No connection in progress.
+        when(mMockWifiInfo.getSupplicantState()).thenReturn(SupplicantState.DISCONNECTED);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(mMockWifiInfo);
+
+        ArgumentCaptor<WifiScanner.ScanListener> mScanListenerCaptor =
+                ArgumentCaptor.forClass(WifiScanner.ScanListener.class);
+        verify(mWifiScanner).startScan(any(), mScanListenerCaptor.capture());
+
+        mScanListenerCaptor.getValue().onFailure(WifiScanner.REASON_ABORT, "Scan aborted");
+        mTestLooper.dispatchAll();
+
+        // Retry via WifiManager.startScan() must proceed normally.
         verify(mMockWifiManager).startScan();
     }
 
