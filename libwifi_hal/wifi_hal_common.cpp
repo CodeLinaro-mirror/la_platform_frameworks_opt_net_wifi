@@ -170,7 +170,6 @@ int wifi_change_driver_state(const char *state) {
 
 int is_wifi_driver_loaded() {
   char driver_status[PROPERTY_VALUE_MAX];
-  char dual_wlan_status[PROPERTY_VALUE_MAX];
 #ifdef WIFI_DRIVER_MODULE_PATH
   FILE *proc;
   char line[sizeof(DRIVER_MODULE_TAG) + 10];
@@ -179,9 +178,6 @@ int is_wifi_driver_loaded() {
   if (!property_get(DRIVER_PROP_NAME, driver_status, NULL)) {
     return 0; /* driver not loaded */
   }
-
-  if (property_get(DUAL_WLAN_PROP_NAME, dual_wlan_status, NULL))
-      is_dual_wlan_on_board = true;
 
   if (!is_driver_loaded) {
     return 0;
@@ -220,6 +216,10 @@ int is_wifi_driver_loaded() {
 }
 
 int wifi_load_driver() {
+  char dual_wlan_status[PROPERTY_VALUE_MAX];
+  if (property_get(DUAL_WLAN_PROP_NAME, dual_wlan_status, NULL)) {
+      is_dual_wlan_on_board = true;
+  }
 #ifdef WIFI_DRIVER_MODULE_PATH
   if (is_wifi_driver_loaded()) {
     return 0;
