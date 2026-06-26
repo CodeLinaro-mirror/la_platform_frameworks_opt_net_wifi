@@ -681,6 +681,10 @@ public class WifiPickerTracker extends BaseWifiTracker {
                             .collect(toList()));
         }
         Collections.sort(wifiEntries, WifiEntry.WIFI_PICKER_COMPARATOR);
+        // OWE protocol relies on a secondary BSS with non-displayable SSID for background
+        // handshake, which should be filtered out.
+        activeWifiEntries.removeIf(WifiPickerTracker::isUnknownOweEntry);
+        wifiEntries.removeIf(WifiPickerTracker::isUnknownOweEntry);
         if (isVerboseLoggingEnabled()) {
             Log.v(TAG, "onWifiEntriesChanged: reason=" + reason);
             StringJoiner entryLog = new StringJoiner("\n");
@@ -712,6 +716,17 @@ public class WifiPickerTracker extends BaseWifiTracker {
         mActiveWifiEntries = activeWifiEntries;
         mWifiEntries = wifiEntries;
         notifyOnWifiEntriesChanged(reason);
+    }
+
+    /**
+     * Returns true if the entry is an OWE network whose SSID could not be decoded and surfaced as
+     * {@link WifiManager#UNKNOWN_SSID} (the OWE transition hidden BSS). Such entries should be
+     * hidden from the user-facing lists since the readable open companion is shown separately.
+     */
+    private static boolean isUnknownOweEntry(@NonNull WifiEntry entry) {
+        return entry instanceof StandardWifiEntry
+                && TextUtils.equals(entry.getSsid(), WifiManager.UNKNOWN_SSID)
+                && entry.getSecurityTypes().contains(WifiInfo.SECURITY_TYPE_OWE);
     }
 
     /**

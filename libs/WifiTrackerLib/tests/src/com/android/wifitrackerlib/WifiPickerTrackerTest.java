@@ -3718,4 +3718,65 @@ public class WifiPickerTrackerTest {
 
         verify(mInjector).cacheWifiManagerVerboseLoggingValue(true);
     }
+
+    @Test
+    public void testGetWifiEntries_unknownOweSsid_entryFiltered() {
+        final ScanResult unknownOweScan =
+                buildScanResult(WifiManager.UNKNOWN_SSID, "bssid0", START_MILLIS);
+        unknownOweScan.capabilities = "[OWE]";
+
+        when(mMockWifiManager.getScanResults())
+                .thenReturn(Collections.singletonList(unknownOweScan));
+
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+        verify(mMockContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                any(), any(), any());
+
+        // Trigger scan results available
+        mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
+                new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+
+        // The OWE entry with unknown SSID should be filtered out
+        assertThat(wifiPickerTracker.getWifiEntries()).isEmpty();
+    }
+
+    @Test
+    public void testGetConnectedEntry_unknownOweSsid_entryFiltered() {
+        final WifiPickerTracker wifiPickerTracker = createTestWifiPickerTracker();
+
+        // Mock connection to an OWE network with unknown SSID
+        when(mMockWifiManager.getCurrentNetwork()).thenReturn(mMockNetwork);
+        when(mMockWifiInfo.getNetworkId()).thenReturn(1);
+        when(mMockWifiInfo.getSSID()).thenReturn(WifiManager.UNKNOWN_SSID);
+        when(mMockWifiInfo.getBSSID()).thenReturn("bssid0");
+        when(mMockWifiInfo.getRssi()).thenReturn(-50);
+        when(mMockWifiInfo.getSupplicantState()).thenReturn(SupplicantState.COMPLETED);
+        when(mMockWifiInfo.isPrimary()).thenReturn(true);
+        when(mMockWifiManager.getConnectionInfo()).thenReturn(mMockWifiInfo);
+        doReturn(true).when(() -> NonSdkApiWrapper.isPrimary(any()));
+
+        // Provide a matching scan result to establish OWE security type
+        final ScanResult unknownOweScan =
+                buildScanResult(WifiManager.UNKNOWN_SSID, "bssid0", START_MILLIS);
+        unknownOweScan.capabilities = "[OWE]";
+        when(mMockWifiManager.getScanResults())
+                .thenReturn(Collections.singletonList(unknownOweScan));
+
+        wifiPickerTracker.onStart();
+        mTestLooper.dispatchAll();
+
+        verify(mMockContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                any(), any(), any());
+
+        // Trigger scan results available to process the scan result and link it to the connection
+        mBroadcastReceiverCaptor.getValue().onReceive(mMockContext,
+                new Intent(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        mTestLooper.dispatchAll();
+
+        // The connected OWE entry with unknown SSID should be filtered out
+        assertThat(wifiPickerTracker.getConnectedWifiEntry()).isNull();
+        assertThat(wifiPickerTracker.getWifiEntries()).isEmpty();
+    }
 }
