@@ -33,6 +33,8 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.ScanResult;
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.WifiStateChangedListener;
 import android.net.wifi.WifiScanner;
@@ -784,6 +786,17 @@ public class BaseWifiTracker {
                         return;
                     }
                     Log.e(mTag, "Failed to scan! Reason: " + reason + ", ");
+                    // If a connection attempt is in progress, skip the immediate retry.
+                    // Issuing another scan while the driver is busy with a connection
+                    // causes back-to-back scan failures (REASON_BUSY). The periodic scan
+                    // loop will resume once the connection completes and scan results
+                    // become available via SCAN_RESULTS_AVAILABLE_ACTION.
+                    WifiInfo wifiInfo = mWifiManager.getConnectionInfo();
+                    if (wifiInfo != null && isSupplicantStateConnecting(
+                            wifiInfo.getSupplicantState())) {
+                        Log.d(mTag, "Skipping scan retry, connection in progress.");
+                        return;
+                    }
                     // First scan failed, start scanning normally anyway.
                     scanLoop();
                 });
@@ -962,6 +975,25 @@ public class BaseWifiTracker {
         @MainThread
         default void onScanRequested() {
             // Do nothing.
+        }
+    }
+
+    /**
+     * Returns true if the given {@link SupplicantState} represents an active connection attempt
+     * or a fully established connection. Equivalent to the {@code @hide}
+     * {@link SupplicantState#isConnecting(SupplicantState)} using only public API constants.
+     */
+    private static boolean isSupplicantStateConnecting(@NonNull SupplicantState state) {
+        switch (state) {
+            case AUTHENTICATING:
+            case ASSOCIATING:
+            case ASSOCIATED:
+            case FOUR_WAY_HANDSHAKE:
+            case GROUP_HANDSHAKE:
+            case COMPLETED:
+                return true;
+            default:
+                return false;
         }
     }
 }
